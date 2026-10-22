@@ -1,0 +1,50 @@
+/* 기존 예약 화면 디자인 재사용 */
+@import "./ReservationPage.css";
+@import "./ReservationConfirm.css";
+
+/* QR코드 영역 */
+.reservation-qr-section {
+  margin-top: 28px;
+  padding: 32px 20px;
+  background: #f8f5ff;
+  border: 1px solid #e8ddff;
+  border-radius: 16px;
+  text-align: center;
+}
+
+/* QR코드 임시 표시 영역 */
+.reservation-qr-placeholder {
+  width: 200px;
+  height: 200px;
+  margin: 0 auto 18px;
+  background: white;
+  border: 2px dashed #b9a5e8;
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #7955d9;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* QR코드 안내 문구 */
+.reservation-qr-section p {
+  color: #777084;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 모바일 화면 */
+@media (max-width: 600px) {
+  .reservation-qr-section {
+    padding: 24px 12px;
+  }
+
+  .reservation-qr-placeholder {
+    width: 180px;
+    height: 180px;
+  }
+}

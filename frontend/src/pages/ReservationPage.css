@@ -1,0 +1,195 @@
+
+/* 예약 페이지 전체 */
+.reservation-page {
+  width: 100%;
+  max-width: 850px;
+  margin: 40px auto;
+  padding: 0 20px 80px;
+  box-sizing: border-box;
+  color: #29243a;
+}
+
+/* POPQ 브랜드 영역 */
+.reservation-hero {
+  padding: 30px 0 32px;
+}
+
+.reservation-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.reservation-logo {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  color: #29243a;
+}
+
+.reservation-logo span {
+  color: #7955d9;
+}
+
+.reservation-brand-tag {
+  padding: 7px 12px;
+  background-color: #f0eaff;
+  border-radius: 20px;
+  color: #7955d9;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.reservation-hero h1 {
+  margin: 0 0 12px;
+  color: #29243a;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.reservation-hero p {
+  margin: 0;
+  color: #777087;
+  font-size: 15px;
+}
+
+/* 예약 진행 단계 */
+.reservation-steps {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.reservation-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: #f0eaff;
+  border-radius: 30px;
+  color: #7955d9;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.reservation-step span {
+  font-weight: 800;
+}
+
+.reservation-step.active {
+  background-color: #7955d9;
+  color: #ffffff;
+}
+
+.reservation-step-arrow {
+  color: #b7a8d9;
+  font-size: 18px;
+}
+
+/* 예약 정보 카드 */
+.reservation-summary {
+  margin-top: 24px;
+  padding: 28px;
+  background-color: #ffffff;
+  border: 1px solid #eae4f3;
+  border-radius: 20px;
+  box-shadow: 0 6px 24px rgba(121, 85, 217, 0.06);
+}
+
+.reservation-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.reservation-summary-header h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.reservation-summary-badge {
+  padding: 7px 12px;
+  background-color: #f0eaff;
+  border-radius: 20px;
+  color: #7955d9;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reservation-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0edf5;
+}
+
+.reservation-summary-row span {
+  color: #777087;
+  font-size: 14px;
+}
+
+.reservation-summary-row strong {
+  color: #29243a;
+  font-size: 15px;
+}
+
+/* 예약 확인 버튼 */
+.reservation-next-button {
+  width: 100%;
+  margin-top: 24px;
+  padding: 17px;
+  background-color: #7955d9;
+  border: none;
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.reservation-next-button:hover {
+  background-color: #6743c7;
+  transform: translateY(-2px);
+}
+
+/* 모바일 화면 */
+@media (max-width: 600px) {
+  .reservation-page {
+    margin: 12px auto;
+    padding: 0 16px 50px;
+  }
+
+  .reservation-hero h1 {
+    font-size: 24px;
+  }
+
+  .reservation-brand {
+    flex-wrap: wrap;
+  }
+
+  .reservation-steps {
+    gap: 7px;
+  }
+
+  .reservation-step {
+    padding: 9px 11px;
+    font-size: 11px;
+  }
+
+  .reservation-step-arrow {
+    font-size: 12px;
+  }
+
+  .reservation-summary {
+    padding: 18px;
+  }
+}
