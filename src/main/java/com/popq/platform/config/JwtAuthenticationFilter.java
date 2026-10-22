@@ -35,13 +35,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String username = jwtTokenProvider.getUsername(token);
                 System.out.println(">>> 3. 토큰에서 추출한 username: " + username);
 
-                // 4. 시큐리티 세션에 권한(ROLE_USER)을 포함한 인증 정보 등록
-                List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
+                // **3-1. 토큰에서 권한(role) 추출**
+                String role = jwtTokenProvider.getRole(token);
+                System.out.println(">>> 3-1. 토큰에서 추출한 role: " + role);
+
+                // 4. 시큐리티 세션에 토큰에서 가져온 권한("ROLE_" + role)을 포함한 인증 정보 등록
+                List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(username, null, authorities);
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                System.out.println(">>> 4. SecurityContext에 인증 및 권한 정보 등록 완료");
+                System.out.println(">>> 4. SecurityContext에 인증 및 권한 정보 등록 완료 (권한: ROLE_" + role + ")");
             } else if (token != null) {
                 System.out.println(">>> 2. 토큰 유효성 검사 결과: 실패 (유효하지 않거나 만료된 토큰)");
             } else {

@@ -24,8 +24,9 @@ public class JwtTokenProvider {
     }
 
     // 토큰 생성
-    public String createToken(String username) {
+    public String createToken(String username, String role) {
         Claims claims = Jwts.claims().setSubject(username);
+        claims.put("role", role); // 클레임에 권한 정보 추가
         Date now = new Date();
         Date validity = new Date(now.getTime() + tokenValidityInMilliseconds);
 
@@ -47,7 +48,7 @@ public class JwtTokenProvider {
         }
     }
 
-    // 토큰에서 사용자 추출
+    // 토큰에서 사용자(username) 추출
     public String getUsername(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key)
@@ -55,5 +56,15 @@ public class JwtTokenProvider {
                 .parseClaimsJws(token)
                 .getBody()
                 .getSubject();
+    }
+
+    // 토큰에서 권한(role) 추출 메서드 추가
+    public String getRole(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("role", String.class);
     }
 }
