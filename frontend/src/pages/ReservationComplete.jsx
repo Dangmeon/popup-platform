@@ -1,6 +1,11 @@
+
 import "./ReservationComplete.css";
+import ReservationTimer from "../components/reservation/ReservationTimer";
 
 function ReservationComplete({ selectedDate, selectedTime }) {
+  // 실제 예약 번호와 QR코드는 추후 백엔드 API에서 받아옴
+  const reservationNumber = "DEMO-000001";
+
   return (
     <main className="reservation-page">
       {/* POPQ 로고 */}
@@ -14,8 +19,8 @@ function ReservationComplete({ selectedDate, selectedTime }) {
           </span>
         </div>
 
-        <h1>예약이 완료되었습니다!</h1>
-        <p>방문 당일 QR코드를 제시해 주세요.</p>
+        <h1>예약 확인증</h1>
+        <p>방문 시 직원에게 예약 확인증을 보여주세요.</p>
       </div>
 
       {/* 예약 진행 단계 */}
@@ -37,10 +42,10 @@ function ReservationComplete({ selectedDate, selectedTime }) {
         </div>
       </div>
 
-      {/* 예약 완료 정보 */}
+      {/* 예약 정보 */}
       <section className="reservation-summary">
         <div className="reservation-summary-header">
-          <h3>예약 완료 정보</h3>
+          <h3>예약 정보</h3>
           <span className="reservation-summary-badge">
             데모 화면
           </span>
@@ -58,20 +63,30 @@ function ReservationComplete({ selectedDate, selectedTime }) {
 
         <div className="reservation-summary-row">
           <span>예약 번호</span>
-          <strong>DEMO-000001</strong>
+          <strong>{reservationNumber}</strong>
         </div>
 
-        {/* QR코드 영역 */}
+        {/* 예약 시작까지 남은 시간 */}
+        <ReservationTimer
+          selectedDate={selectedDate}
+          selectedTime={selectedTime}
+        />
+
+        {/* 백엔드 QR코드 연동 예정 */}
         <div className="reservation-qr-section">
           <div className="reservation-qr-placeholder">
-            QR코드 표시 영역
+            QR코드 발급 예정
           </div>
 
-          <p>실제 QR코드는 예약 API 연동 후 발급됩니다.</p>
+          <p>
+            실제 QR코드는 백엔드 예약 API 연동 후
+            표시됩니다.
+          </p>
         </div>
 
+        {/* 데모 안내 */}
         <p className="reservation-confirm-notice">
-          ※ 현재 화면은 프론트엔드 테스트용입니다.
+          ※ 현재는 프론트엔드 테스트용 화면입니다.
           실제 예약은 생성되지 않았습니다.
         </p>
       </section>

@@ -1,11 +1,11 @@
+import "./ReservationConfirm.css";
 
-import { QRCodeSVG } from "qrcode.react";
-import "./ReservationComplete.css";
-
-function ReservationComplete({ selectedDate, selectedTime }) {
-  // 백엔드 연결 전까지 사용하는 테스트 예약 번호
-  const reservationNumber = "DEMO-000001";
-
+function ReservationConfirm({
+  selectedDate,
+  selectedTime,
+  onBack,
+  onConfirm,
+}) {
   return (
     <main className="reservation-page">
       {/* POPQ 로고 */}
@@ -19,8 +19,8 @@ function ReservationComplete({ selectedDate, selectedTime }) {
           </span>
         </div>
 
-        <h1>예약 확인증</h1>
-        <p>방문 시 직원에게 예약 확인증을 보여주세요.</p>
+        <h1>예약 정보를 확인해 주세요</h1>
+        <p>선택하신 날짜와 시간이 맞는지 확인해 주세요.</p>
       </div>
 
       {/* 예약 진행 단계 */}
@@ -31,13 +31,13 @@ function ReservationComplete({ selectedDate, selectedTime }) {
 
         <span className="reservation-step-arrow">→</span>
 
-        <div className="reservation-step">
+        <div className="reservation-step active">
           <span>02</span>예약 확인
         </div>
 
         <span className="reservation-step-arrow">→</span>
 
-        <div className="reservation-step active">
+        <div className="reservation-step">
           <span>03</span>예약 완료
         </div>
       </div>
@@ -45,9 +45,9 @@ function ReservationComplete({ selectedDate, selectedTime }) {
       {/* 예약 정보 */}
       <section className="reservation-summary">
         <div className="reservation-summary-header">
-          <h3>예약 정보</h3>
+          <h3>선택한 예약 정보</h3>
           <span className="reservation-summary-badge">
-            데모 화면
+            확인 중
           </span>
         </div>
 
@@ -61,36 +61,32 @@ function ReservationComplete({ selectedDate, selectedTime }) {
           <strong>{selectedTime}</strong>
         </div>
 
-        <div className="reservation-summary-row">
-          <span>예약 번호</span>
-          <strong>{reservationNumber}</strong>
-        </div>
-
-        {/* QR코드 */}
-        <div className="reservation-qr-section">
-          <div className="reservation-qr-placeholder">
-            <QRCodeSVG
-              value={reservationNumber}
-              size={160}
-              marginSize={4}
-            />
-          </div>
-
-          <p>
-            방문 시 QR코드와 예약 번호를
-            직원에게 보여주세요.
-          </p>
-        </div>
-
-        {/* 데모 안내 */}
         <p className="reservation-confirm-notice">
-          ※ 현재는 프론트엔드 테스트용 화면입니다.
-          실제 예약은 생성되지 않았으며,
-          QR코드는 입장에 사용할 수 없습니다.
+          현재는 테스트 화면입니다. 실제 예약 및 QR코드 발급은
+          서버 연동 후 가능합니다.
         </p>
+
+        {/* 버튼 */}
+        <div className="reservation-confirm-actions">
+          <button
+            type="button"
+            className="reservation-back-button"
+            onClick={onBack}
+          >
+            ← 이전으로
+          </button>
+
+          <button
+            type="button"
+            className="reservation-next-button"
+            onClick={onConfirm}
+          >
+            데모 예약 완료 보기 →
+          </button>
+        </div>
       </section>
     </main>
   );
 }
 
-export default ReservationComplete;
+export default ReservationConfirm;
