@@ -29,4 +29,8 @@ public class User {
 
     @Column(name = "phone", nullable = false)
     private String phone;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private Role role = Role.USER; // 기본값은 일반 유저(USER)로 설정
 }
