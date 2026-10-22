@@ -40,11 +40,17 @@ public class AuthController {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
-        String token = jwtTokenProvider.createToken(user.getUsername());
+        // 1. 유저의 권한 정보를 가져옵니다.
+        String role = user.getRole().name();
+
+        // 2. requestDto에서 username을 가져와 토큰 생성에 전달
+        String token = jwtTokenProvider.createToken(requestDto.getUsername(), role);
+
+        // 3. 생성된 토큰을 응답으로 반환
         return ResponseEntity.ok(token);
     }
 
-    @GetMapping("/api/test")
+    @GetMapping("/test")
     public ResponseEntity<String> test() {
         return ResponseEntity.ok("인증 성공! 토큰이 정상적으로 작동합니다.");
     }
