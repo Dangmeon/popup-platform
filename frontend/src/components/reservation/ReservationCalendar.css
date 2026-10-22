@@ -1,0 +1,140 @@
+
+/* 달력 전체 */
+.reservation-calendar {
+  padding: 28px;
+  background-color: #ffffff;
+  border: 1px solid #eae4f3;
+  border-radius: 20px;
+  box-shadow: 0 6px 24px rgba(121, 85, 217, 0.06);
+}
+
+/* 달력 헤더 */
+.calendar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.calendar-header h3 {
+  margin: 0;
+  color: #29243a;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+/* 월 이동 */
+.calendar-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calendar-navigation span {
+  color: #29243a;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.calendar-navigation button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #eae4f3;
+  border-radius: 50%;
+  background-color: #f5f1ff;
+  color: #7955d9;
+  font-size: 23px;
+  cursor: pointer;
+}
+
+.calendar-navigation button:hover:not(:disabled) {
+  background-color: #e9dfff;
+}
+
+.calendar-navigation button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* 달력 날짜 */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.calendar-weekday {
+  padding: 10px 0;
+  color: #777087;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.calendar-weekday:first-child {
+  color: #e66b8c;
+}
+
+.calendar-weekday:nth-child(7) {
+  color: #7955d9;
+}
+
+.calendar-day {
+  width: 100%;
+  max-width: 52px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background-color: #f5f1ff;
+  color: #29243a;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.calendar-day:hover:not(:disabled) {
+  background-color: #e9dfff;
+  border-color: #a78bfa;
+}
+
+/* 선택된 날짜 */
+.calendar-day.selected {
+  background-color: #7955d9;
+  border-color: #7955d9;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(121, 85, 217, 0.25);
+}
+
+/* 예약 불가능한 날짜 */
+.calendar-day.unavailable {
+  background-color: #faf9fc;
+  color: #d1cbd9;
+  cursor: not-allowed;
+}
+
+/* 예약 안내 */
+.calendar-notice {
+  margin: 22px 0 0;
+  color: #777087;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* 모바일 화면 */
+@media (max-width: 600px) {
+  .reservation-calendar {
+    padding: 18px;
+  }
+
+  .calendar-grid {
+    gap: 4px;
+  }
+
+  .calendar-day {
+    border-radius: 10px;
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,119 @@
+
+/* 기존 예약 화면 디자인 재사용 */
+@import "./ReservationPage.css";
+@import "./ReservationConfirm.css";
+
+/* ============================= */
+/* 예약 카운트다운 타이머 */
+/* ============================= */
+
+.reservation-timer {
+  margin-top: 28px;
+  padding: 28px 20px;
+
+  background: linear-gradient(
+    135deg,
+    #f4efff 0%,
+    #ebe2ff 100%
+  );
+
+  border: 1px solid #dfd0ff;
+  border-radius: 16px;
+
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(121, 85, 217, 0.08);
+}
+
+/* 타이머 안내 문구 */
+.reservation-timer p {
+  margin: 0 0 12px;
+
+  color: #76658f;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 남은 시간 숫자 */
+.reservation-timer h2 {
+  margin: 0;
+
+  color: #7955d9;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  line-height: 1.4;
+
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================= */
+/* QR코드 영역 */
+/* ============================= */
+
+.reservation-qr-section {
+  margin-top: 28px;
+  padding: 32px 20px;
+
+  background: #f8f5ff;
+  border: 1px solid #e8ddff;
+  border-radius: 16px;
+
+  text-align: center;
+}
+
+/* QR코드 임시 표시 영역 */
+.reservation-qr-placeholder {
+  width: 200px;
+  height: 200px;
+  margin: 0 auto 18px;
+
+  background: white;
+  border: 2px dashed #b9a5e8;
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #7955d9;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* QR코드 안내 문구 */
+.reservation-qr-section p {
+  margin: 0;
+
+  color: #777084;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ============================= */
+/* 모바일 화면 */
+/* ============================= */
+
+@media (max-width: 600px) {
+  .reservation-timer {
+    margin-top: 20px;
+    padding: 24px 12px;
+  }
+
+  .reservation-timer h2 {
+    font-size: 25px;
+    letter-spacing: 0;
+  }
+
+  .reservation-timer p {
+    font-size: 13px;
+  }
+
+  .reservation-qr-section {
+    padding: 24px 12px;
+  }
+
+  .reservation-qr-placeholder {
+    width: 180px;
+    height: 180px;
+  }
+}

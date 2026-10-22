@@ -1,0 +1,108 @@
+
+/* 시간 선택 영역 */
+.time-slot-selector {
+  margin-top: 24px;
+  padding: 28px;
+  background-color: #ffffff;
+  border: 1px solid #eae4f3;
+  border-radius: 20px;
+  box-shadow: 0 6px 24px rgba(121, 85, 217, 0.06);
+}
+
+.time-slot-selector h3 {
+  margin: 0 0 22px;
+  color: #29243a;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+/* 시간 버튼 배치 */
+.time-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* 시간 버튼 */
+.time-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  background-color: #ffffff;
+  border: 1px solid #eae4f3;
+  border-radius: 14px;
+  color: #29243a;
+  cursor: pointer;
+  transition: 0.2s;
+  text-align: left;
+}
+
+.time-slot:hover:not(:disabled) {
+  background-color: #f5f1ff;
+  border-color: #a78bfa;
+  transform: translateY(-2px);
+}
+
+/* 선택된 시간 */
+.time-slot.selected {
+  background-color: #f0eaff;
+  border: 2px solid #7955d9;
+  padding: 15px;
+  box-shadow: 0 4px 12px rgba(121, 85, 217, 0.1);
+}
+
+.time-slot-time {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.time-slot-remaining {
+  color: #7955d9;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 예약 마감 */
+.time-slot:disabled {
+  background-color: #f7f6f9;
+  border-color: #eeeaf1;
+  color: #aaa3b2;
+  cursor: not-allowed;
+}
+
+.time-slot:disabled .time-slot-remaining {
+  color: #aaa3b2;
+}
+
+/* 날짜 선택 안내 */
+.time-slot-notice {
+  margin: 0;
+  padding: 20px;
+  background-color: #f8f6ff;
+  border-radius: 12px;
+  color: #777087;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* 모바일 화면 */
+@media (max-width: 600px) {
+  .time-slot-selector {
+    padding: 18px;
+  }
+
+  .time-slot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .time-slot {
+    padding: 14px;
+  }
+
+  .time-slot.selected {
+    padding: 13px;
+  }
+}

@@ -1,0 +1,68 @@
+@import "./ReservationPage.css";
+
+/* 안내 문구 */
+.reservation-confirm-notice {
+  margin-top: 24px;
+  padding: 16px;
+  background-color: #f8f5ff;
+  border-radius: 12px;
+  color: #7955d9;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 버튼 영역 */
+.reservation-confirm-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+/* 이전 버튼 */
+.reservation-back-button {
+  flex: 1;
+  padding: 16px;
+  background-color: #ffffff;
+  border: 1px solid #dcd2f3;
+  border-radius: 14px;
+  color: #7955d9;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.reservation-back-button:hover {
+  background-color: #f0eaff;
+}
+
+/* 예약 확정 버튼 */
+.reservation-confirm-button {
+  flex: 2;
+  padding: 16px;
+  background-color: #7955d9;
+  border: none;
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 비활성화 상태 */
+.reservation-confirm-button:disabled {
+  background-color: #c9b9ed;
+  cursor: not-allowed;
+}
+
+/* 모바일 */
+@media (max-width: 600px) {
+  .reservation-confirm-buttons {
+    flex-direction: column;
+  }
+
+  .reservation-back-button,
+  .reservation-confirm-button {
+    width: 100%;
+  }
+}
