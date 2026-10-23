@@ -1,16 +1,16 @@
 package com.popq.platform.dto;
 
-import com.popq.platform.entity.PopupStoreEntity;
-import lombok.*;
+import com.popq.platform.entity.PopupStore;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
 
 import java.time.LocalDate;
 
 @Getter
-@Setter
-@NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PopupStoreDTO {
+public class PopupStoreResponse {
     private Long popId;
     private String title;
     private String location;
@@ -25,8 +25,11 @@ public class PopupStoreDTO {
     private Integer reservPeopleCap;
     private String walkinStatus;
 
-    public static PopupStoreDTO toDto(PopupStoreEntity entity) {
-        return PopupStoreDTO.builder()
+    // [회원 연동] 로그인 회원의 찜 여부
+
+    // Entity -> Response 변환시 사용
+    public static PopupStoreResponse toDto(PopupStore entity) {
+        return PopupStoreResponse.builder()
             .popId(entity.getPopId())
             .title(entity.getTitle())
             .location(entity.getLocation())

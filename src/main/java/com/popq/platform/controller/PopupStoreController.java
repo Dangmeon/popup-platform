@@ -1,6 +1,7 @@
 package com.popq.platform.controller;
 
-import com.popq.platform.dto.PopupStoreDTO;
+import com.popq.platform.dto.PopupStoreRequest;
+import com.popq.platform.dto.PopupStoreResponse;
 import com.popq.platform.service.PopupStoreService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,8 +24,9 @@ public class PopupStoreController {
     // /popup/popupList                  : 전체
     // /popup/popupList?status=ONGOING   : 진행중
     // /popup/popupList?category=FASHION : 카테고리별
+    // [회원 연동] 로그인한 회원이면 찜(favorite) 여부를 함께 반환
     @GetMapping("/popup/popupList")
-    public List<PopupStoreDTO> listPopup(
+    public List<PopupStoreResponse> listPopup(
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "category", required = false) String category) {
         if ("ONGOING".equals(status)) {
@@ -36,22 +38,28 @@ public class PopupStoreController {
         return service.listAllPopup();
     }
 
+    // [회원 연동] 로그인한 회원이면 찜(favorite) 여부를 함께 반환
+    // - favorite 테이블 (target_type = 'POPUP', pop_id) 조회
+
     // 팝업 상세 조회
     @GetMapping("/popup/popupDetailView/{popId}")
-    public PopupStoreDTO detailViewPopup(@PathVariable("popId") Long popId) {
+    public PopupStoreResponse detailViewPopup(@PathVariable("popId") Long popId) {
         return service.detailViewPopup(popId);
     }
 
-    // 팝업 등록 : React(Axios)에서 JSON으로 보내므로 @RequestBody 필요
+    // [회원 연동] 아래 등록/수정/삭제는 관리자(ADMIN)만 호출 가능하도록 권한 체크 필요
+    //  - Security/ADMIN 권한 작업 후 적용
+
+    // 팝업 등록
     @PostMapping("/popup/insert")
-    public Long insertPopup(@RequestBody PopupStoreDTO dto) {
-        return service.insertPopup(dto); // 생성된 popId 반환
+    public Long insertPopup(@RequestBody PopupStoreRequest request) {
+        return service.insertPopup(request); // 생성된 popId 반환
     }
 
     // 팝업 수정
-    @PutMapping("/popup/update")
-    public void updatePopup(@RequestBody PopupStoreDTO dto) {
-        service.updatePopup(dto);
+    @PutMapping("/popup/update/{popId}")
+    public void updatePopup(@PathVariable("popId") Long popId, @RequestBody PopupStoreRequest request) {
+        service.updatePopup(popId, request);
     }
 
     // 팝업 삭제

@@ -1,6 +1,6 @@
 package com.popq.platform.entity;
 
-import com.popq.platform.dto.PopupStoreDTO;
+import com.popq.platform.dto.PopupStoreRequest;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +15,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PopupStoreEntity {
+public class PopupStore {
     @Id
     @SequenceGenerator(name = "popup_store_seq_gen", sequenceName = "popup_store_seq", allocationSize = 1)
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "popup_store_seq_gen")
@@ -59,21 +59,23 @@ public class PopupStoreEntity {
     @Column(name = "walkin_status")
     private String walkinStatus;
 
-    public static PopupStoreEntity toEntity(PopupStoreDTO dto) {
-        return PopupStoreEntity.builder()
-            .popId(dto.getPopId())
-            .title(dto.getTitle())
-            .location(dto.getLocation())
-            .startDate(dto.getStartDate())
-            .endDate(dto.getEndDate())
-            .category(dto.getCategory() != null ? dto.getCategory() : "ETC")
-            .description(dto.getDescription())
-            .storeImg(dto.getStoreImg())
-            .roundNum(dto.getRoundNum())
-            .reservStart(dto.getReservStart())
-            .reservEnd(dto.getReservEnd())
-            .reservPeopleCap(dto.getReservPeopleCap())
-            .walkinStatus(dto.getWalkinStatus() != null ? dto.getWalkinStatus() : "OPEN")
+    // Request -> Entity 변환시 사용
+    // 등록 : popId = null (시퀀스가 번호 생성) / 수정 : popId = 수정할 팝업 번호
+    public static PopupStore toEntity(Long popId, PopupStoreRequest request) {
+        return PopupStore.builder()
+            .popId(popId)
+            .title(request.getTitle())
+            .location(request.getLocation())
+            .startDate(request.getStartDate())
+            .endDate(request.getEndDate())
+            .category(request.getCategory() != null ? request.getCategory() : "ETC")
+            .description(request.getDescription())
+            .storeImg(request.getStoreImg())
+            .roundNum(request.getRoundNum())
+            .reservStart(request.getReservStart())
+            .reservEnd(request.getReservEnd())
+            .reservPeopleCap(request.getReservPeopleCap())
+            .walkinStatus(request.getWalkinStatus() != null ? request.getWalkinStatus() : "OPEN")
             .build();
     }
 }
