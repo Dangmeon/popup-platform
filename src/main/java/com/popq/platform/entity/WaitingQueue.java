@@ -19,9 +19,9 @@ public class WaitingQueue {
     @Column(name = "waiting_id") // DB의 waiting_id를
     private Long waitingId; // 코드에선 waitingId 이렇게 쓰겠다는 뜻
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "pop_id", nullable = false)
-//    private PopupStore popupStore;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pop_id", nullable = false)
+    private PopupStore popupStore; // 팝업 엔티티 생성 및 명칭 통일 필요 (현재 오류 있음)
 
     @Column(name = "phone", nullable = false, length = 20) // NOT NULL VARCHAR2(20)
     private String phone;
@@ -46,8 +46,8 @@ public class WaitingQueue {
     private LocalDateTime expiresAt;
 
     @Builder
-    public WaitingQueue(/*PopupStore popupStore ,*/ String phone, int peopleCount, Integer queueNumber) {
-//        this.popupStore = popupStore;
+    public WaitingQueue(PopupStore popupStore, String phone, int peopleCount, Integer queueNumber) { // 팝업 엔티티 생성 및 명칭 통일 필요 (현재 오류 있음)
+        this.popupStore = popupStore; // 팝업 엔티티 생성 및 명칭 통일 필요 (현재 오류 있음)
         this.phone = phone; // 연락처
         this.peopleCount = peopleCount; // 인원수
         this.queueNumber = queueNumber; // 대기 번호

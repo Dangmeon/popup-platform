@@ -18,7 +18,7 @@ import java.util.List;
 public class WaitingService {
 
     private final WaitingQueueRepository waitingQueueRepository;
-//    private final PopupStoreRepository popupStoreRepository; -- 팝업 레포 추가 되면 주석 해제
+    private final PopupStoreRepository popupStoreRepository; // 팝업 레포 추가 필요 (현재 오류)
 
     // 현장 대기열 등록
 
@@ -26,15 +26,13 @@ public class WaitingService {
     public WaitingStatusResponse registerWaiting(WaitingRegisterRequest request) {
 
         // 팝업스토어 존재 여부 확인
-//        PopupStore popup = popupStoreRepository.findById(request.getPopId())
-//                .orElseThrow(() -> new IllegalArgumentException("해당 팝업스토어가 존재하지 않습니다. ID: " + request.getPopId()));
-// -- 팝업 추가 되면 주석 해제
+        PopupStore popup = popupStoreRepository.findById(request.getPopId()) // 팝업 엔티티 및 레포 생성 명칭 통일 필요 (현재 오류 있음)
+                .orElseThrow(() -> new IllegalArgumentException("해당 팝업스토어가 존재하지 않습니다. ID: " + request.getPopId()));
 
         // 팝업 운영 상태 검증 (walkin_status == 'OPEN'인지?)
-//        if (!"OPEN".equalsIgnoreCase(popup.getWalkinStatus())) {
-//            throw new IllegalStateException("현재 해당 팝업스토어는 현장 대기 접수가 마감되었거나 중단되었습니다.");
-//        }
-// -- 팝업 추가 되면 주석 해제
+        if (!"OPEN".equalsIgnoreCase(popup.getWalkinStatus())) {
+            throw new IllegalStateException("현재 해당 팝업스토어는 현장 대기 접수가 마감되었거나 중단되었습니다.");
+        } // 팝업 엔티티 생성 및 명칭 통일 필요 (현재 오류 있음)
 
         // 중복 접수 방지 (동일 팝업에 이미 등록되어 WAITING 혹은 CALLED 상태인 전화번호인지?)
         List<WaitingStatus> activeStatuses = List.of(WaitingStatus.WAITING, WaitingStatus.CALLED);
@@ -50,29 +48,27 @@ public class WaitingService {
 
         // 당일 대기번호 처리(당일 자정 00:00:00 이후 기준 MAX 번호 + 1)
         LocalDateTime startOfToday = LocalDate.now().atStartOfDay(); // 당일 00:00:00 시간을 의미,, 이때 대기 번호 최댓값 0으로 초기화
-//        int nextQueueNumber = waitingQueueRepository.findMaxQueueNumberToday(request.getPopId(), startOfToday)
-//                .orElse(0) + 1;
-// 역시 팝업 추가될 시 주석 해제
+        int nextQueueNumber = waitingQueueRepository.findMaxQueueNumberToday(request.getPopId(), startOfToday)
+                .orElse(0) + 1;
 
         // WaitingQueue 엔티티 생성 및 데이터베이스 저장
         WaitingQueue newWaiting = WaitingQueue.builder()
-                // .popupStore(popup) // 팝업 추가 되면 주석 해제
+                .popupStore(popup) // 팝업 추가 필요
                 .phone(request.getPhone())
                 .peopleCount(request.getPeopleCount())
-                // .queueNumber(nextQueueNumber) // 역시 팝업 추가될 시 주석 해제
+                .queueNumber(nextQueueNumber) // 팝업 추가 필요
                 .build();
 
         WaitingQueue savedWaiting = waitingQueueRepository.save(newWaiting);
 
         // 내 앞 대기 팀 수 계산 (나보다 작은 번호이면서 현재 순수 WAITING 상태인 팀 수)
-//        long teamsAhead = waitingQueueRepository.countTeamsAhead(
-//                request.getPopId(),
-//                WaitingStatus.WAITING, // WAITING 상태이면서
-//                savedWaiting.getQueueNumber()  // 번호
-//        );
-// 여기도 팝업 추가될 시 주석 해제
+        long teamsAhead = waitingQueueRepository.countTeamsAhead(
+                request.getPopId(),
+                WaitingStatus.WAITING, // WAITING 상태이면서
+                savedWaiting.getQueueNumber()  // 번호
+        ); // 팝업 추가 필요
 
         // 응답 DTO 생성 및 반환 (팀당 예상 체류 시간 DEFAULT : 5분)
-        return WaitingStatusResponse.of(savedWaiting, 1,/*teamsAhead*/ 5); // 여기도 팝업 들어와야 1대신 teamsAhead 집어 넣을 수 있음
+        return WaitingStatusResponse.of(savedWaiting, teamsAhead, 5); // 팝업 추가 필요
     }
 }

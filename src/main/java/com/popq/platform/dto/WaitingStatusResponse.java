@@ -24,7 +24,7 @@ public class WaitingStatusResponse {
     public static WaitingStatusResponse of(WaitingQueue queue, long teamsAhead, int estimatedMinutesPerTeam) {
         return WaitingStatusResponse.builder()
                 .waitingId(queue.getWaitingId())
-               // .popId(queue.getPopupStore().getPopId()) -- 팝업 객체 생성 시 주석 해제
+                .popId(queue.getPopupStore().getPopId()) // 팝업 메소드 생성 및 명칭 통일 필요 (현재 오류 있음)
                 .queueNumber(queue.getQueueNumber())
                 .teamsAhead(teamsAhead)
                 .estimatedWaitMinutes((int) (teamsAhead * estimatedMinutesPerTeam)) // (예상 대기 시간) = (팀당 평균 체류 시간) * (남은 팀 수)
