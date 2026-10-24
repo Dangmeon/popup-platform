@@ -71,4 +71,26 @@ public class WaitingService {
         // 응답 DTO 생성 및 반환 (팀당 예상 체류 시간 DEFAULT : 5분)
         return WaitingStatusResponse.of(savedWaiting, teamsAhead, 5); // 팝업 추가 필요
     }
+
+    // 현재 대기 상태 조회 메소드
+    @Transactional //readonly
+    public WaitingStatusResponse getWaitingStatus(Long waitingId) {
+
+        // 대기열 내역 조회
+        WaitingQueue queue = waitingQueueRepository.findById(waitingId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId)); // 없으면 예외 던지기
+
+        // 내 앞 대기 팀 수 계산 (기본 0팀, 앞 팀이 현재 WAITING 상태인 경우에만 계산)
+        long teamsAhead = 0;
+        if (queue.getWaitingStatus() == WaitingStatus.WAITING) {
+            teamsAhead = waitingQueueRepository.countTeamsAhead(
+                    queue.getPopupStore().getPopId(), // 팝업 추가 필요
+                    WaitingStatus.WAITING,
+                    queue.getQueueNumber()
+            );
+        }
+
+        // 현재 상태 DTO 반환
+        return WaitingStatusResponse.of(queue, teamsAhead, 5);
+    }
 }
