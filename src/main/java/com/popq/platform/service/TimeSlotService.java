@@ -80,7 +80,7 @@ public class TimeSlotService {
     // 예약이 있으면 날짜/시간은 못 바꾸고 정원만 변경 가능
     @Transactional
     public void updateTimeSlot(Long timeSlotId, TimeSlotRequest request) {
-        TimeSlot slot = findTimeSlot(timeSlotId);
+        TimeSlot slot = findTimeSlotForUpdate(timeSlotId); // 락 : 수정 중에 예약 인원이 바뀌지 않도록
         PopupStore popup = slot.getPopupStore();
         checkTimeSlot(popup, request);
 
@@ -105,7 +105,7 @@ public class TimeSlotService {
     // 예약이 있거나 예약 이력이 있으면 삭제 불가
     @Transactional
     public void deleteTimeSlot(Long timeSlotId) {
-        TimeSlot slot = findTimeSlot(timeSlotId);
+        TimeSlot slot = findTimeSlotForUpdate(timeSlotId); // 락 : 삭제 중에 예약이 들어오지 않도록
         if (slot.getReservedCount() > 0) {
             throw new IllegalArgumentException("예약이 있는 회차는 삭제할 수 없습니다.");
         }
@@ -129,6 +129,11 @@ public class TimeSlotService {
 
     private TimeSlot findTimeSlot(Long timeSlotId) {
         return timeSlotRepo.findById(timeSlotId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회차입니다. timeSlotId=" + timeSlotId));
+    }
+
+    private TimeSlot findTimeSlotForUpdate(Long timeSlotId) {
+        return timeSlotRepo.findByIdForUpdate(timeSlotId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회차입니다. timeSlotId=" + timeSlotId));
     }
 
