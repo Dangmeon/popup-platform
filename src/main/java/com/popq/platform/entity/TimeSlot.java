@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "time_slot")
@@ -16,6 +17,11 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class TimeSlot {
+
+    // 예약 오픈 : 회차 날짜 7일 전 10:00 / 예약 마감 : 회차 날짜 하루 전까지 (당일 0시에 마감)
+    public static final int RESERV_OPEN_DAYS_BEFORE = 7;
+    public static final LocalTime RESERV_OPEN_TIME = LocalTime.of(10, 0); // 오픈 시각 확정되면 여기만 수정
+
     @Id
     @SequenceGenerator(name = "time_slot_seq_gen", sequenceName = "time_slot_seq", allocationSize = 1)
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "time_slot_seq_gen")
@@ -43,7 +49,7 @@ public class TimeSlot {
     @Column(name = "capacity")
     private Integer capacity;
 
-    @Column(name = "reserved_count")
+    @Column(name = "reserved_count", updatable = false)
     private Integer reservedCount;
 
     // Request -> Entity 변환시 사용

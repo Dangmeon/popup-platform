@@ -18,4 +18,6 @@ public class TimeSlotGenerateRequest {
     private String startTime;        // 생성 시작 시간 "HH:mm", 비우면 팝업의 reservStart
     private String endTime;          // 생성 종료 시간 "HH:mm", 비우면 팝업의 reservEnd
     private Integer breakMinutes;    // 회차 사이 정비시간(분), 비우면 0분
+    private String lunchStart;       // 점심시간 시작 "HH:mm", 비우면 점심시간 없음
+    private String lunchEnd;        // 점심시간 끝 "HH:mm", lunchStart와 같이 입력
 }
