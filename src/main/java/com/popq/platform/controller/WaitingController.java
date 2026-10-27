@@ -7,10 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 현장 대기열 등록 API
@@ -28,11 +25,21 @@ public class WaitingController {
 
     private final WaitingService waitingService;
 
+    // 등록
     @PostMapping
     public ResponseEntity<WaitingStatusResponse> registerWaiting(
             @Valid @RequestBody WaitingRegisterRequest request // WaitingRegisterRequest의 조건 검증 미충족시 400 bad request
     ) {
         WaitingStatusResponse response = waitingService.registerWaiting(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response); // 201
+    }
+
+    // 조회
+    @GetMapping("/{waitingId}")
+    public ResponseEntity<WaitingStatusResponse> getWaitingStatus(
+            @PathVariable("waitingId") Long waitingId
+    ) {
+        WaitingStatusResponse response = waitingService.getWaitingStatus(waitingId);
+        return ResponseEntity.ok(response); // 200
     }
 }

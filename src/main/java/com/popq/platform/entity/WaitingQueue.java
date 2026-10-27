@@ -15,8 +15,13 @@ import java.time.LocalDateTime;
 public class WaitingQueue {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "waiting_id") // DB의 waiting_id를
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "waiting_queue_seq_gen")
+    @SequenceGenerator(
+            name = "waiting_queue_seq_gen",
+            sequenceName = "WAITING_QUEUE_SEQ", // DB의 실제 시퀀스 이름
+            allocationSize = 1                  // 1씩 증가
+    ) // 시퀀스 매핑
+    @Column(name = "waiting_id")// DB의 waiting_id를
     private Long waitingId; // 코드에선 waitingId 이렇게 쓰겠다는 뜻
 
     @ManyToOne(fetch = FetchType.LAZY)
