@@ -1,5 +1,6 @@
 package com.popq.platform.repository;
 
+import com.popq.platform.entity.PopupStore;
 import com.popq.platform.entity.WaitingQueue;
 import com.popq.platform.entity.WaitingStatus;
 import jakarta.persistence.LockModeType;
@@ -17,7 +18,7 @@ public interface WaitingQueueRepository extends JpaRepository<WaitingQueue, Long
 
     // 팝업당 중복 방지용 비관적 락(읽기 트랜잭션이 진행될 경우 완료 전까지 다른 트랜잭션 R/W 모두 차단) 적용
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT p FROM PopupStore p WHERE p.popId = :popId") // 팝업 필요
+    @Query("SELECT p FROM PopupStore p WHERE p.popId = :popId")
     Optional<PopupStore> findByIdWithPessimisticLock(@Param("popId") Long popId);
 
     // 중복 대기 방지 (팝업 엔티티 생성시 및 명칭 통일 필요)
@@ -45,7 +46,6 @@ public interface WaitingQueueRepository extends JpaRepository<WaitingQueue, Long
     // 5 : WAITING      6(me): WAITING
     // = 2 반환
 
-    // 팝업 엔티티 생성 및 명칭 통일 필요 (현재 오류 있음)
     @Query("SELECT COUNT(w) FROM WaitingQueue w WHERE w.popupStore.popId = :popId AND w.waitingStatus = :status AND w.queueNumber < :queueNumber") // 해당 팝업에서 WAITING 상태이면서 번호가 더 작은 사람들을 카운팅하는 쿼리
     long countTeamsAhead(
             @Param("popId") Long popId, // 팝업아이디

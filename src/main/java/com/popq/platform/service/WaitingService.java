@@ -2,11 +2,14 @@ package com.popq.platform.service;
 
 import com.popq.platform.dto.WaitingRegisterRequest;
 import com.popq.platform.dto.WaitingStatusResponse;
+import com.popq.platform.entity.PopupStore;
 import com.popq.platform.entity.WaitingQueue;
 import com.popq.platform.entity.WaitingStatus;
+import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.repository.WaitingQueueRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -14,12 +17,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WaitingService {
 
     private final WaitingQueueRepository waitingQueueRepository;
-    private final PopupStoreRepository popupStoreRepository; // 팝업 레포 추가 필요 (현재 오류)
+    private final PopupStoreRepository popupStoreRepository;
     private final SimpMessagingTemplate messagingTemplate; // Spring이 제공하는 STOMP 메시지 발송 도구(WebSocket 메시지 전송용) 생성
 
     // 현장 대기열 등록
@@ -27,8 +31,8 @@ public class WaitingService {
     @Transactional
     public WaitingStatusResponse registerWaiting(WaitingRegisterRequest request) {
 
-        // 팝업스토어 존재 여부 확인 (+ 비관적 락)
-        PopupStore popup = popupStoreRepository.findByIdWithPessimisticLock(request.getPopId()) // 팝업 엔티티 및 레포 생성 명칭 통일 필요 (현재 오류 있음)
+        // 팝업스토어 존재 여부 확인
+        PopupStore popup = popupStoreRepository.findByIdWithPessimisticLock(request.getPopId()) // + 비관적 락 팝업 레포에서 정의 필요
                 .orElseThrow(() -> new IllegalArgumentException("해당 팝업스토어가 존재하지 않습니다. ID: " + request.getPopId()));
 
         // 팝업 운영 상태 검증 (walkin_status == 'OPEN'인지?)
@@ -55,10 +59,10 @@ public class WaitingService {
 
         // WaitingQueue 엔티티 생성 및 데이터베이스 저장
         WaitingQueue newWaiting = WaitingQueue.builder()
-                .popupStore(popup) // 팝업 추가 필요
+                .popupStore(popup)
                 .phone(request.getPhone())
                 .peopleCount(request.getPeopleCount())
-                .queueNumber(nextQueueNumber) // 팝업 추가 필요
+                .queueNumber(nextQueueNumber)
                 .build();
 
         WaitingQueue savedWaiting = waitingQueueRepository.save(newWaiting);
@@ -68,14 +72,15 @@ public class WaitingService {
                 request.getPopId(),
                 WaitingStatus.WAITING, // WAITING 상태이면서
                 savedWaiting.getQueueNumber()  // 번호
-        ); // 팝업 추가 필요
+        );
 
         // 응답 DTO 생성 (팀당 예상 체류 시간 DEFAULT : 5분)
         WaitingStatusResponse response = WaitingStatusResponse.of(savedWaiting, teamsAhead, 5);
 
-        // WebSocket 메시지 실시간 전송
+        // [웹소켓] 실시간 갱신
+        // [웹소켓] 고객용 개별 메시지
         messagingTemplate.convertAndSend("/topic/waitings/" + savedWaiting.getWaitingId(), response);
-        // (2) 해당 매장 전체/관리자 구독 경로로 갱신 알림 발행
+        // [웹소켓] 팝업 스토어에서 고객을 받을 때 받는 매니저/관리자용 메시지
         messagingTemplate.convertAndSend("/topic/popups/" + request.getPopId() + "/waitings", response);
 
         log.info("[WebSocket] 대기열 등록 실시간 메시지 발송 완료 - waitingId: {}, popId: {}",
@@ -96,7 +101,7 @@ public class WaitingService {
         long teamsAhead = 0;
         if (queue.getWaitingStatus() == WaitingStatus.WAITING) {
             teamsAhead = waitingQueueRepository.countTeamsAhead(
-                    queue.getPopupStore().getPopId(), // 팝업 추가 필요
+                    queue.getPopupStore().getPopId(),
                     WaitingStatus.WAITING,
                     queue.getQueueNumber()
             );
