@@ -19,8 +19,6 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
 
-    // WebSecurityCustomizer는 제거하거나 비워두는 것이 안전합니다.
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
