@@ -7,6 +7,7 @@ import com.popq.platform.entity.WaitingStatus;
 import com.popq.platform.repository.WaitingQueueRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -19,14 +20,15 @@ public class WaitingService {
 
     private final WaitingQueueRepository waitingQueueRepository;
     private final PopupStoreRepository popupStoreRepository; // 팝업 레포 추가 필요 (현재 오류)
+    private final SimpMessagingTemplate messagingTemplate; // Spring이 제공하는 STOMP 메시지 발송 도구(WebSocket 메시지 전송용) 생성
 
     // 현장 대기열 등록
 
     @Transactional
     public WaitingStatusResponse registerWaiting(WaitingRegisterRequest request) {
 
-        // 팝업스토어 존재 여부 확인
-        PopupStore popup = popupStoreRepository.findById(request.getPopId()) // 팝업 엔티티 및 레포 생성 명칭 통일 필요 (현재 오류 있음)
+        // 팝업스토어 존재 여부 확인 (+ 비관적 락)
+        PopupStore popup = popupStoreRepository.findByIdWithPessimisticLock(request.getPopId()) // 팝업 엔티티 및 레포 생성 명칭 통일 필요 (현재 오류 있음)
                 .orElseThrow(() -> new IllegalArgumentException("해당 팝업스토어가 존재하지 않습니다. ID: " + request.getPopId()));
 
         // 팝업 운영 상태 검증 (walkin_status == 'OPEN'인지?)
@@ -68,8 +70,18 @@ public class WaitingService {
                 savedWaiting.getQueueNumber()  // 번호
         ); // 팝업 추가 필요
 
-        // 응답 DTO 생성 및 반환 (팀당 예상 체류 시간 DEFAULT : 5분)
-        return WaitingStatusResponse.of(savedWaiting, teamsAhead, 5); // 팝업 추가 필요
+        // 응답 DTO 생성 (팀당 예상 체류 시간 DEFAULT : 5분)
+        WaitingStatusResponse response = WaitingStatusResponse.of(savedWaiting, teamsAhead, 5);
+
+        // WebSocket 메시지 실시간 전송
+        messagingTemplate.convertAndSend("/topic/waitings/" + savedWaiting.getWaitingId(), response);
+        // (2) 해당 매장 전체/관리자 구독 경로로 갱신 알림 발행
+        messagingTemplate.convertAndSend("/topic/popups/" + request.getPopId() + "/waitings", response);
+
+        log.info("[WebSocket] 대기열 등록 실시간 메시지 발송 완료 - waitingId: {}, popId: {}",
+                savedWaiting.getWaitingId(), request.getPopId());
+        // 반환
+        return response;
     }
 
     // 현재 대기 상태 조회 메소드
