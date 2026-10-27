@@ -4,6 +4,8 @@ import com.popq.platform.dto.ReservationCreateRequest;
 import com.popq.platform.dto.ReservationResponse;
 import com.popq.platform.dto.ReservationUpdateRequest;
 import com.popq.platform.repository.ReservationRepository;
+import com.popq.platform.repository.TimeSlotRepository;
+import com.popq.platform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -12,8 +14,8 @@ import org.springframework.stereotype.Service;
 public class ReservationService {
 
     private final ReservationRepository reservationRepository;
-    // private final TimeSlotRepository timeSlotRepository;
-    // private final MemberRepository memberRepository;
+    private final TimeSlotRepository timeSlotRepository;
+    private final UserRepository userRepository;
 
     // 예약 생성
     public ReservationResponse createReservation(Long memberId, ReservationCreateRequest request){

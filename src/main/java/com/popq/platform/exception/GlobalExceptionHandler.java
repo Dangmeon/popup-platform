@@ -39,4 +39,16 @@ public class GlobalExceptionHandler {
         error.put("error", "이미 사용 중인 정보(전화번호 등)입니다.");
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
+
+    // 예약 에러 처리
+    @ExceptionHandler(ReservationException.class)
+    public ResponseEntity<Map<String, String>> handleReservationException(ReservationException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+
+    }
 }

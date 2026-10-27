@@ -10,28 +10,28 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
-//
-//    @Query("""
-//        SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END
-//        FROM Reservation r
-//        WHERE r.member.id = :memberId
-//            AND r.timeSlot.id = :timeSlotId
-//            AND r.reservationStatus IN :statuses
-//    """)
-//    boolean existsActiveReservation(
-//            @Param("memberId") Long memberId,
-//            @Param("timeSlotId") Long timeSlotId,
-//            @Param("statuses") List<ReservationStatus> statuses
-//    );
-//
-//    @Query("""
-//        SELECT r
-//        FROM Reservation r
-//        WHERE r.reservationStatus = :status
-//            AND r.expiresAt < :now
-//    """)
-//    List<Reservation> findExpiredReservations(
-//            @Param("status") ReservationStatus status,
-//            @Param("now") LocalDateTime now
-//    );
+
+    @Query("""
+        SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END
+        FROM Reservation r
+        WHERE r.user.id = :memberId
+            AND r.timeSlot.timeSlotId = :timeSlotId
+            AND r.reservationStatus IN :statuses
+    """)
+    boolean existsActiveReservation(
+            @Param("memberId") Long memberId,
+            @Param("timeSlotId") Long timeSlotId,
+            @Param("statuses") List<ReservationStatus> statuses
+    );
+
+    @Query("""
+        SELECT r
+        FROM Reservation r
+        WHERE r.reservationStatus = :status
+            AND r.expiresAt < :now
+    """)
+    List<Reservation> findExpiredReservations(
+            @Param("status") ReservationStatus status,
+            @Param("now") LocalDateTime now
+    );
 }

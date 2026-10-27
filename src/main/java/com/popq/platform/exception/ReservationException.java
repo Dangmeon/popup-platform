@@ -1,5 +1,8 @@
 package com.popq.platform.exception;
 
+import lombok.Getter;
+
+@Getter
 public class ReservationException extends RuntimeException{
 
     private final ReservationErrorCode errorCode;
@@ -9,7 +12,4 @@ public class ReservationException extends RuntimeException{
         this.errorCode = errorCode;
     }
 
-    public ReservationErrorCode getErrorCode() {
-        return errorCode;
-    }
 }
