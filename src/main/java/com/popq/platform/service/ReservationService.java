@@ -130,7 +130,20 @@ public class ReservationService {
     // 예약 상세 조회
     @Transactional(readOnly = true)
     public ReservationDetailResponse getReservation(Long memberId, Long reservationId){
-        return null;
+        // 1. reservationId로 예약 조회
+        // 2. 예약 존재 여부 확인
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+
+        // 3. 본인 예약인지 확인
+        // TODO: 회원 예외 처리 구조 통일 후 커스텀 예외로 변경
+        if(!reservation.getUser().getId().equals(memberId)){
+            throw new IllegalArgumentException("회원이 아닙니다.");
+        }
+
+        // 4. time_slot / popup_store 정보 조회
+        // 5. 상세정보 반환
+        return ReservationDetailResponse.fromDetailReservation(reservation);
     }
 
     // 예약 확정
