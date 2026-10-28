@@ -49,10 +49,10 @@ public class WaitingService {
         // 중복 접수 방지 (동일 팝업에 이미 등록되어 WAITING 혹은 CALLED 상태인 전화번호인지?)
         List<WaitingStatus> activeStatuses = List.of(WaitingStatus.WAITING, WaitingStatus.CALLED);
         boolean isAlreadyWaiting = waitingQueueRepository.existsByPopupStorePopIdAndPhoneAndWaitingStatusIn(
-                request.getPopId(),
-                request.getPhone(),
-                activeStatuses
-        ); // return true or false
+                request.getPopId(), // 팝업이 같은지?
+                request.getPhone(), // 휴대폰이 같은지?
+                activeStatuses // 호출 or 대기 상태인지?
+        ); // return true or false 셋다 true면 true 반환
 
         if (isAlreadyWaiting) {
             throw new IllegalStateException("이미 대기 접수되었거나 호출 중인 번호입니다.");
@@ -134,7 +134,7 @@ public class WaitingService {
                 .popId(waiting.getPopupStore().getPopId())
                 .queueNumber(waiting.getQueueNumber())
                 .teamsAhead(0)
-                .estimatedWaitMinutes(0)
+                .estimatedWaitMins(0)
                 .status(waiting.getWaitingStatus())
                 .joinedAt(waiting.getJoinedAt())
                 .build();

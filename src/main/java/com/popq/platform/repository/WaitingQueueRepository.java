@@ -1,11 +1,8 @@
 package com.popq.platform.repository;
 
-import com.popq.platform.entity.PopupStore;
 import com.popq.platform.entity.WaitingQueue;
 import com.popq.platform.entity.WaitingStatus;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,15 +10,10 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-
+// 팝업당 중복 방지용 비관적 락(읽기 트랜잭션이 진행될 경우 완료 전까지 다른 트랜잭션 R/W 모두 차단) 적용
 public interface WaitingQueueRepository extends JpaRepository<WaitingQueue, Long> { // WaitingQueue와 PK waitingId
 
-    // 팝업당 중복 방지용 비관적 락(읽기 트랜잭션이 진행될 경우 완료 전까지 다른 트랜잭션 R/W 모두 차단) 적용
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT p FROM PopupStore p WHERE p.popId = :popId")
-    Optional<PopupStore> findByIdWithPessimisticLock(@Param("popId") Long popId);
-
-    // 중복 대기 방지 (팝업 엔티티 생성시 및 명칭 통일 필요)
+    // 중복 대기 방지
     boolean existsByPopupStorePopIdAndPhoneAndWaitingStatusIn( // JpaRepository의 existsByPopupStorePopIdAndPhoneAndWaitingStatusIn 메소드 이용
             Long popId, // 팝업 번호
             String phone, // 연락처
@@ -30,9 +22,6 @@ public interface WaitingQueueRepository extends JpaRepository<WaitingQueue, Long
     // true일 경우 '이미 접수된 대기표가 있습니다.' 예외처리
 
     // 당일 마지막 대기번호 조회
-    // 여러 명이 동시에 등록할 때(동시성 제어)
-
-    // 팝업 엔티티 생성 및 명칭 통일 필요 (현재 오류 있음)
     @Query("SELECT MAX(w.queueNumber) FROM WaitingQueue w WHERE w.popupStore.popId = :popId AND w.joinedAt >= :startOfDay") // 해당 팝업에서 자정 이후로 계산된 대기 번호 중 가장 큰 번호를 찾는 쿼리
     Optional<Integer> findMaxQueueNumberToday(
             @Param("popId") Long popId, // 팝업아이디

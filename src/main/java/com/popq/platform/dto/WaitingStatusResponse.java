@@ -17,7 +17,7 @@ public class WaitingStatusResponse {
     private Long popId;              // 팝업스토어 ID
     private Integer queueNumber;     // 당일 대기 번호 (ex: 1번, 2번)
     private long teamsAhead;         // 내 앞 대기 팀 수 (ex: 0팀, 3팀)
-    private int estimatedWaitMinutes;// 예상 대기 시간 (분)
+    private int estimatedWaitMins;// 예상 대기 시간 (분)
     private WaitingStatus status;    // 현재 상태 (WAITING)
     private LocalDateTime joinedAt;  // 접수 일시
 
@@ -27,7 +27,7 @@ public class WaitingStatusResponse {
                 .popId(queue.getPopupStore().getPopId())
                 .queueNumber(queue.getQueueNumber())
                 .teamsAhead(teamsAhead)
-                .estimatedWaitMinutes((int) (teamsAhead * estimatedMinutesPerTeam)) // (예상 대기 시간) = (팀당 평균 체류 시간) * (남은 팀 수)
+                .estimatedWaitMins((int) (teamsAhead * estimatedMinutesPerTeam)) // (예상 대기 시간) = (팀당 평균 체류 시간) * (남은 팀 수)
                 .status(queue.getWaitingStatus())
                 .joinedAt(queue.getJoinedAt())
                 .build();
