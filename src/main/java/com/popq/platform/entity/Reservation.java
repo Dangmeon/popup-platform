@@ -68,13 +68,17 @@ public class Reservation {
         this.peopleCount = peopleCount;
     }
 
-    public static Reservation create(User user, TimeSlot timeSlot, int peopleCount, LocalDateTime expiresAt){
+    public void updateQrToken(String qrToken) {
+        this.qrToken = qrToken;
+    }
+
+    public static Reservation create(User user, TimeSlot timeSlot, int peopleCount, LocalDateTime reservedAt, LocalDateTime expiresAt){
         return Reservation.builder()
                 .user(user)
                 .timeSlot(timeSlot)
                 .peopleCount(peopleCount)
                 .reservationStatus(ReservationStatus.HOLD)
-                .reservedAt(LocalDateTime.now())
+                .reservedAt(reservedAt)
                 .expiresAt(expiresAt)
                 .build();
     }
