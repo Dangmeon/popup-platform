@@ -193,6 +193,133 @@ public class ReservationService {
         return ReservationResponse.fromReservation(reservation);
     }
 
+    // 예약 변경
+    @Transactional
+    public ReservationResponse updateReservation(Long memberId, Long reservationId, ReservationUpdateRequest request){
+        // 1. 예약 존재 확인
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+
+        // 2. 본인 예약인지 확인
+        // TODO: 회원 예외 처리 구조 통일 후 커스텀 예외로 변경
+        if(!reservation.getUser().getId().equals(memberId)){
+            throw new IllegalArgumentException("회원이 아닙니다.");
+        }
+
+        // 3. 변경 가능한 상태인지 확인
+        // CONFIRMED 상태의 예약만 변경 가능
+        // TODO: INVALID_RESERVATION_STATUS 에러코드로 변경
+        if (reservation.getReservationStatus() != ReservationStatus.CONFIRMED) {
+            throw new ReservationException(
+                    ReservationErrorCode.INVALID_RESERVATION_STATUS
+            );
+        }
+
+        // 4. 기존/변경 회차 ID 확인
+        // 5. 같은 회차는 단일 락 획득
+        //    다른 회차는 데드락 방지를 위해 작은 ID부터 순서대로 비관적 락 획득
+        Long oldTimeSlotId = reservation.getTimeSlot().getTimeSlotId();
+        Long newTimeSlotId = request.timeSlotId();
+
+        TimeSlot oldTimeSlot;
+        TimeSlot newTimeSlot;
+
+        if (oldTimeSlotId.equals(newTimeSlotId)) {
+
+            // 같은 회차 → 하나만 락
+            TimeSlot timeSlot = timeSlotRepository.findByIdForUpdate(oldTimeSlotId)
+                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.TIMESLOT_NOT_FOUND));
+
+            oldTimeSlot = timeSlot;
+            newTimeSlot = timeSlot;
+
+        } else {
+
+            // 다른 회차 → 항상 작은 ID부터 락
+            Long firstId = Math.min(oldTimeSlotId, newTimeSlotId);
+            Long secondId = Math.max(oldTimeSlotId, newTimeSlotId);
+
+            TimeSlot firstTimeSlot = timeSlotRepository.findByIdForUpdate(firstId)
+                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.TIMESLOT_NOT_FOUND));
+
+            TimeSlot secondTimeSlot = timeSlotRepository.findByIdForUpdate(secondId)
+                    .orElseThrow(() -> new ReservationException(ReservationErrorCode.TIMESLOT_NOT_FOUND));
+
+            oldTimeSlot = oldTimeSlotId.equals(firstId) ? firstTimeSlot : secondTimeSlot;
+
+            newTimeSlot = newTimeSlotId.equals(firstId) ? firstTimeSlot : secondTimeSlot;
+        }
+
+        // 6. 변경할 회차의 예약 가능 기간 확인
+        LocalDateTime openAt = LocalDateTime.of(
+                newTimeSlot.getSlotDate().minusDays(TimeSlot.RESERV_OPEN_DAYS_BEFORE),
+                TimeSlot.RESERV_OPEN_TIME
+        );
+
+        LocalDateTime closeAt = newTimeSlot.getSlotDate().atStartOfDay();
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (now.isBefore(openAt) || !now.isBefore(closeAt)) {
+            throw new ReservationException(
+                    ReservationErrorCode.RESERVATION_NOT_AVAILABLE
+            );
+        }
+
+        // 7. 변경할 예약 인원 유효성 확인
+        // 예약 가능 인원: 1 ~ MAX_PEOPLE_COUNT
+        if (request.peopleCount() < 1 ||
+                request.peopleCount() > MAX_PEOPLE_COUNT) {
+            throw new ReservationException(ReservationErrorCode.INVALID_PEOPLE_COUNT);
+        }
+
+        // 8. 기존 회차와 변경할 회차가 동일한지 확인
+        boolean sameTimeSlot = oldTimeSlot.getTimeSlotId().equals(newTimeSlot.getTimeSlotId());
+
+        if(sameTimeSlot){
+            // 9. 같은 회차인 경우 기존 인원과 변경 인원의 차이 계산
+            int difference = request.peopleCount() - reservation.getPeopleCount();
+
+            // 10. 인원이 증가하는 경우 추가 인원만큼 정원 확인 후 증가
+            if(difference > 0){
+                if(oldTimeSlot.getReservedCount() + difference > oldTimeSlot.getCapacity()){
+                    throw new ReservationException(ReservationErrorCode.CAPACITY_EXCEEDED);
+                }
+
+                oldTimeSlot.increaseReservedCount(difference);
+
+                // 11. 인원이 감소하는 경우 감소한 인원만큼 정원 복구
+            }else if (difference < 0) {
+                oldTimeSlot.decreaseReservedCount(Math.abs(difference));
+            }
+
+            // 12. 예약 인원 변경
+            reservation.updateTimeSlot(newTimeSlot, request.peopleCount());
+
+            return ReservationResponse.fromReservation(reservation);
+        }
+
+        // 13. 다른 회차로 변경하는 경우 새 회차 정원 확인
+        if(newTimeSlot.getReservedCount() + request.peopleCount() > newTimeSlot.getCapacity()){
+            throw new ReservationException(ReservationErrorCode.CAPACITY_EXCEEDED);
+        }
+
+        // 14. 기존 회차에서 기존 예약 인원만큼 정원 복구
+        oldTimeSlot.decreaseReservedCount(reservation.getPeopleCount());
+
+        // 15. 새 회차에 변경할 예약 인원만큼 정원 증가
+        newTimeSlot.increaseReservedCount(request.peopleCount());
+
+        // 16. 예약의 회차 및 인원 변경
+        reservation.updateTimeSlot(newTimeSlot, request.peopleCount());
+
+        String newQrToken = UUID.randomUUID().toString();
+        reservation.updateQrToken(newQrToken);
+
+        // 17. 변경 결과 반환
+        return ReservationResponse.fromReservation(reservation);
+    }
+
     // 예약 취소
     @Transactional
     public ReservationResponse cancelReservation(Long memberId, Long reservationId){
