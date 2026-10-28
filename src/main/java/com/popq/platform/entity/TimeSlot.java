@@ -49,7 +49,7 @@ public class TimeSlot {
     @Column(name = "capacity")
     private Integer capacity;
 
-    @Column(name = "reserved_count", updatable = false)
+    @Column(name = "reserved_count")
     private Integer reservedCount;
 
     // Request -> Entity 변환시 사용
@@ -66,5 +66,21 @@ public class TimeSlot {
             .capacity(request.getCapacity())
             .reservedCount(reservedCount)
             .build();
+    }
+
+    // [예약 연동] 예약 인원 증가 / 감소
+    // 반드시 TimeSlotRepository.findByIdForUpdate()로 락을 걸고 조회한 회차에서 호출
+    public void increaseReservedCount(int count) {
+        if (reservedCount + count > capacity) {
+            throw new IllegalStateException("남은 자리가 부족합니다. (남은 자리: " + (capacity - reservedCount) + "명)");
+        }
+        this.reservedCount += count;
+    }
+
+    public void decreaseReservedCount(int count) {
+        if (reservedCount - count < 0) {
+            throw new IllegalStateException("예약 인원이 0명 미만이 될 수 없습니다.");
+        }
+        this.reservedCount -= count;
     }
 }
