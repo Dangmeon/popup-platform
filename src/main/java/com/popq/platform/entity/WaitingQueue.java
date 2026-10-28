@@ -66,7 +66,17 @@ public class WaitingQueue {
     } // 입장 할 때
 
     public void cancel() {
-        this.waitingStatus = WaitingStatus.CANCELLED; // 상태 'CANCELLED'
+        if (this.waitingStatus == WaitingStatus.ENTERED) {
+            throw new IllegalStateException("이미 입장 완료된 대기는 취소할 수 없습니다.");
+        }
+        if (this.waitingStatus == WaitingStatus.CANCELLED) {
+            throw new IllegalStateException("이미 취소된 대기입니다.");
+        }
+        if (this.waitingStatus == WaitingStatus.EXPIRED) {
+            throw new IllegalStateException("이미 만료 처리된 대기입니다.");
+        }
+
+        this.waitingStatus = WaitingStatus.CANCELLED;
     } // 취소 될 때
 
     public void expire() {

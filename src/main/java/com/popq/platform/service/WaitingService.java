@@ -35,10 +35,16 @@ public class WaitingService {
         PopupStore popup = popupStoreRepository.findByIdWithPessimisticLock(request.getPopId()) // + 비관적 락 팝업 레포에서 정의 필요
                 .orElseThrow(() -> new IllegalArgumentException("해당 팝업스토어가 존재하지 않습니다. ID: " + request.getPopId()));
 
+        // 다만 위 코드의 경우 비관적 락을 지금 팝업에 거는 행위임. 지금은 이거 외엔 순서 락을 걸 다른 기준이 없어 어쩔 수 없이 사용
+        // 다음과 같은 문제점이 발생할 수 있음
+        // 1. 락이 걸리면 관리자 팝업 CRUD에도 영향이 감
+        // 2. 사람이 많이 몰릴 때 트랜잭션 내부에 부가 작업이 조금이라도 길어지면 뒤쪽 요청들은 커넥션 풀을 고갈시키며 응답 지연이 발생.
+        // 현재 임시로 사용하고 나중에 다른 대안이 필요 1. 별도의 순번 카운터 테이블 분리 / 2. 원자적 갱신 쿼리 / 3. Redis의 INCR 사용(대규모) 등등
+
         // 팝업 운영 상태 검증 (walkin_status == 'OPEN'인지?)
         if (!"OPEN".equalsIgnoreCase(popup.getWalkinStatus())) {
             throw new IllegalStateException("현재 해당 팝업스토어는 현장 대기 접수가 마감되었거나 중단되었습니다.");
-        } // 팝업 엔티티 생성 및 명칭 통일 필요 (현재 오류 있음)
+        }
 
         // 중복 접수 방지 (동일 팝업에 이미 등록되어 WAITING 혹은 CALLED 상태인 전화번호인지?)
         List<WaitingStatus> activeStatuses = List.of(WaitingStatus.WAITING, WaitingStatus.CALLED);
@@ -109,5 +115,36 @@ public class WaitingService {
 
         // 현재 상태 DTO 반환
         return WaitingStatusResponse.of(queue, teamsAhead, 5);
+    }
+
+    // 대기열 취소 메소드
+    @Transactional
+    public WaitingStatusResponse cancelWaiting(Long waitingId) {
+
+        // 대기열 내역 조회
+        WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+
+        // 검증 및 CANCELLED로 상태 변경
+        waiting.cancel();
+
+        // 취소 상태 응답 DTO 생성 (취소되었으므로 앞 팀 수와 예상 대기 시간은 0으로 초기화)
+        WaitingStatusResponse response = WaitingStatusResponse.builder()
+                .waitingId(waiting.getWaitingId())
+                .popId(waiting.getPopupStore().getPopId())
+                .queueNumber(waiting.getQueueNumber())
+                .teamsAhead(0)
+                .estimatedWaitMinutes(0)
+                .status(waiting.getWaitingStatus())
+                .joinedAt(waiting.getJoinedAt())
+                .build();
+
+        // [웹소켓] 취소자 본인 + 관리자 페이지에 변경사항 반영
+        messagingTemplate.convertAndSend("/topic/waitings/" + waiting.getWaitingId(), response);
+        messagingTemplate.convertAndSend("/topic/popups/" + waiting.getPopupStore().getPopId() + "/waitings", response);
+
+        log.info("[대기 취소 완료] waitingId: {}, popId: {}", waiting.getWaitingId(), waiting.getPopupStore().getPopId());
+
+        return response;
     }
 }
