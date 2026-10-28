@@ -368,6 +368,48 @@ public class ReservationService {
     // QR 조회
     @Transactional(readOnly = true)
     public byte[] getQr(Long memberId, Long reservationId){
-        return null;
+        // 1. reservationId로 예약 조회
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+        // 2. 본인 예약인지 확인
+        if(!reservation.getUser().getId().equals(memberId)){
+            throw new IllegalArgumentException("회원이 아닙니다.");
+        }
+        // 3. 예약 상태가 CONFIRMED인지 확인
+        if(reservation.getReservationStatus() != ReservationStatus.CONFIRMED){
+            throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS);
+        }
+
+        String qrToken = reservation.getQrToken();
+        // 4. qr_token 존재 여부 확인
+        if(qrToken == null){
+            throw new ReservationException(ReservationErrorCode.QR_TOKEN_NOT_FOUND);
+        }
+
+        // 5. QR 이미지 생성
+        MultiFormatWriter writer = new MultiFormatWriter();
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        try{
+            BitMatrix bitMatrix = writer.encode(
+                    qrToken,
+                    BarcodeFormat.QR_CODE,
+                    300,
+                    300
+            );
+
+            MatrixToImageWriter.writeToStream(
+                    bitMatrix,
+                    "PNG",
+                    outputStream
+            );
+
+            // 6. byte[] 반환
+            return outputStream.toByteArray();
+        } catch (WriterException | IOException e) {
+            throw new ReservationException(
+                    ReservationErrorCode.QR_GENERATION_FAILED
+            );
+        }
     }
 }
