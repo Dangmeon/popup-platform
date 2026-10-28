@@ -149,7 +149,48 @@ public class ReservationService {
     // 예약 확정
     @Transactional
     public ReservationResponse confirmReservation(Long memberId, Long reservationId){
-        return null;
+        // 1. reservationId로 예약 조회
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+
+        // 2. 본인 예약 여부 확인
+        // TODO: 회원 예외 처리 구조 통일 후 커스텀 예외로 변경
+        if(!reservation.getUser().getId().equals(memberId)){
+            throw new IllegalArgumentException("회원이 아닙니다.");
+        }
+
+        // 3. 예약 상태가 HOLD인지 확인
+        if(reservation.getReservationStatus() != ReservationStatus.HOLD){
+            throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS);
+        }
+
+        // 4. expiresAt 만료 여부 확인
+        // 5. 만료됐으면 EXPIRED 처리 + 정원 복구
+        // 6. 만료 전이면 CONFIRMED로 변경
+        /**
+         *  나중에 레디스 구현 시 별도 서비스에서 처리 후 호출하게
+         * **/
+        TimeSlot timeSlot = timeSlotRepository.findByIdForUpdate(reservation.getTimeSlot().getTimeSlotId())
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.TIMESLOT_NOT_FOUND));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if(!now.isBefore(reservation.getExpiresAt())){
+            reservation.expire();
+            timeSlot.decreaseReservedCount(reservation.getPeopleCount());
+
+            return ReservationResponse.fromReservation(reservation);
+        }
+
+        // 7. QR 생성용 qr_token 발급
+        // TODO: 웨이팅/입장 검증 API 확정 후
+        // qrToken 대신 관리자 검증 페이지 URL을 QR에 인코딩하도록 변경
+        String token = UUID.randomUUID().toString();
+
+        reservation.confirm(token);
+
+        // 8. 결과 반환
+        return ReservationResponse.fromReservation(reservation);
     }
 
     // 예약 취소
