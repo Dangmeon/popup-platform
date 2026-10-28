@@ -15,7 +15,12 @@ import java.time.LocalDateTime;
 public class WaitingQueue {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "waiting_queue_seq_gen") // 시퀀스 매핑
+    @SequenceGenerator(
+            name = "waiting_queue_seq_gen",
+            sequenceName = "WAITING_QUEUE_SEQ",
+            allocationSize = 1
+    )
     @Column(name = "waiting_id") // DB의 waiting_id를
     private Long waitingId; // 코드에선 waitingId 이렇게 쓰겠다는 뜻
 
