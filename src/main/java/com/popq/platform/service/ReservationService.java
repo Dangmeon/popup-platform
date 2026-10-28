@@ -323,7 +323,46 @@ public class ReservationService {
     // 예약 취소
     @Transactional
     public ReservationResponse cancelReservation(Long memberId, Long reservationId){
-        return null;
+        // 1. reservationId로 예약 조회
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
+        // 2. 본인 예약인지 확인
+        if(!reservation.getUser().getId().equals(memberId)){
+            throw new IllegalArgumentException("회원이 아닙니다.");
+        }
+        // 3. 현재 상태 확인
+        // 4. 취소 가능한 상태인지 확인
+        // 5. 취소 가능 시간 정책 확인
+        if(reservation.getReservationStatus() != ReservationStatus.CONFIRMED){
+            throw new ReservationException(ReservationErrorCode.INVALID_RESERVATION_STATUS);
+        }
+
+        TimeSlot timeSlot = timeSlotRepository.findByIdForUpdate(
+                        reservation.getTimeSlot().getTimeSlotId())
+                .orElseThrow(() -> new ReservationException(ReservationErrorCode.TIMESLOT_NOT_FOUND));
+
+        LocalDateTime visitStart = LocalDateTime.of(
+                timeSlot.getSlotDate(),
+                LocalTime.parse(timeSlot.getStartTime())
+        );
+
+        LocalDateTime cancelDeadLine = visitStart.minusMinutes(CANCEL_DEADLINE_MINUTES);
+        LocalDateTime now = LocalDateTime.now();
+
+        if (!now.isBefore(cancelDeadLine)) {
+            throw new ReservationException(
+                    ReservationErrorCode.CANCELLATION_DEADLINE_PASSED
+            );
+        }
+
+        // 7. reserved_count에서 peopleCount만큼 복구
+        timeSlot.decreaseReservedCount(reservation.getPeopleCount());
+
+        // 6. CANCELLED로 변경
+        reservation.cancel();
+
+        // 8. 결과 반환
+        return ReservationResponse.fromReservation(reservation);
     }
 
     // QR 조회
