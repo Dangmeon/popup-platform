@@ -2,6 +2,7 @@ package com.popq.platform.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -13,6 +14,7 @@ public class SignupRequest {
 
     @NotBlank(message = "이메일(아이디)은 필수 입력 값입니다.")
     @Email(message = "올바른 이메일 형식이어야 합니다.")
+    @Pattern(regexp = "^[A-Za-z0-9._%+-]+@gmail\\.com$", message = "구글 이메일(@gmail.com)만 가입할 수 있습니다.")
     private String username;
 
     @NotBlank(message = "비밀번호는 필수 입력 값입니다.")
