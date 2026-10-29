@@ -1,6 +1,7 @@
 package com.popq.platform.controller;
 
 import com.popq.platform.dto.LoginRequest;
+import com.popq.platform.dto.PasswordFindRequest;
 import com.popq.platform.dto.SignupRequest;
 import com.popq.platform.service.UserService;
 import jakarta.validation.Valid;
@@ -25,6 +26,12 @@ public class AuthController {
     public ResponseEntity<String> login(@RequestBody @Valid LoginRequest requestDto) {
         String token = userService.login(requestDto);
         return ResponseEntity.ok(token);
+    }
+
+    @PostMapping("/find-password")
+    public ResponseEntity<String> findPassword(@RequestBody @Valid PasswordFindRequest requestDto) {
+        userService.findPassword(requestDto);
+        return ResponseEntity.ok("임시 비밀번호가 발급되었습니다.");
     }
 
     @GetMapping("/test")
