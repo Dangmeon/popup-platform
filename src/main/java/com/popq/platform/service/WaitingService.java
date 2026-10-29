@@ -154,6 +154,61 @@ public class WaitingService {
         return response;
     }
 
+    // [관리자용] 대기자 호출 (WAITING -> CALLED로 변경)
+    // @param waitingId 대기열 ID
+    // @param timeoutMinutes 입장 제한/유효 시간 (예: 10분)
+    @Transactional
+    public WaitingStatusResponse callWaiting(Long waitingId, int timeoutMinutes) {
+        // 대기열 내역 조회
+        WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+
+        // 엔티티 상태 전이 (규칙 검증(WAITING 인지?) 및 calledAt, expiresAt 시각 설정)
+        waiting.call(timeoutMinutes);
+
+        // 응답 DTO 생성 (호출 상태(앞에 아무도 없는 상태)는 앞 대기 팀 수와 대기 시간은 0 처리)
+        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, 0, 0);
+
+        // [웹소켓]
+        // - 고객: 입장 안내 팝업 유도
+        // - 관리자: 대기자 리스트 내 상태를 '호출 중'으로 실시간 변경
+        sendWebSocketNotification(
+                waiting.getWaitingId(),
+                waiting.getPopupStore().getPopId(),
+                response,
+                "대기자 호출"
+        );
+
+        return response;
+    }
+
+     // [관리자용] 입장 완료 처리 (CALLED / WAITING -> ENTERED)
+     // @param waitingId 대기열 ID
+    @Transactional
+    public WaitingStatusResponse enterWaiting(Long waitingId) {
+        // 대기열 내역 조회
+        WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+
+        // 엔티티 상태 전이 (규칙 검증(WAITING or CALLED인지?) + enteredAt(추가 한다면) 기록)
+        waiting.enter();
+
+        // 응답 DTO 생성
+        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, 0, 0);
+
+        // [웹소켓]
+        // - 고객 개인 채널: '입장 완료' 처리
+        // - 매장 관리자 채널: 활성 대기자 목록에서 퇴장 처리 (화면에서 제거)
+        sendWebSocketNotification(
+                waiting.getWaitingId(),
+                waiting.getPopupStore().getPopId(),
+                response,
+                "입장 완료"
+        );
+
+        return response;
+    }
+
     // 웹소켓 전달 메소드
     private void sendWebSocketNotification(Long waitingId, Long popId, WaitingStatusResponse response, String actionName) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) { // TransactionSynchronizationManager에 의해 DB가 커밋이 되었는지 검증

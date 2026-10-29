@@ -44,6 +44,9 @@ public class WaitingQueue {
     @Column(name = "joined_at", nullable = false, updatable = false) // 대기열 등록 시간 NOT NULL READONLY
     private LocalDateTime joinedAt;
 
+    @Transient // 매핑 x 임시
+    private LocalDateTime enteredAt; //  입장 시간(평균 대기 시간 계산 시 필요)
+
     @Column(name = "called_at") // 호출 시간
     private LocalDateTime calledAt;
 
@@ -58,17 +61,37 @@ public class WaitingQueue {
         this.queueNumber = queueNumber; // 대기 번호
         this.waitingStatus = WaitingStatus.WAITING; // 기본값 'WAITING'
         this.joinedAt = LocalDateTime.now(); // 대기 등록 = 현재 시간
-    }
+    } // 등록 될 때
 
     public void call(int timeoutMinutes) {
-        this.waitingStatus = WaitingStatus.CALLED; // 상태 'CALLED'
-        this.calledAt = LocalDateTime.now(); // 호출 = 현재 시간
-        this.expiresAt = this.calledAt.plusMinutes(timeoutMinutes);
-    } // 호출 될 때
+        if (this.waitingStatus != WaitingStatus.WAITING) { // WAITING 상태가 아니라면 예외 던지기
+            throw new IllegalStateException("대기 상태인 대기열만 호출할 수 있습니다. 현재 상태: " + this.waitingStatus);
+        } //
+
+        LocalDateTime now = LocalDateTime.now(); // 현재 시간 객체 생성
+        this.waitingStatus = WaitingStatus.CALLED; // called로 변경
+        this.calledAt = now; // 호출 시각 = 현재 시각
+        this.expiresAt = now.plusMinutes(timeoutMinutes); // 현재 시각 + 타임아웃 시간
+    } // 호출 될 때 (WAITING -> CALLED)
+
 
     public void enter() {
+        validateEnterable();  // 입장 확인용 메소드
         this.waitingStatus = WaitingStatus.ENTERED; // 상태 'ENTERED'
-    } // 입장 할 때
+        this.enteredAt = LocalDateTime.now(); // 보류 : 칼럼이 아직 DB에 없음 추가 시 @Transient만 지우고 반영하면 됨
+    } // 입장 할 때 (CALLED -> ENTERED)
+
+    private void validateEnterable() { // 검증 (-> ENTERED)
+        if (this.waitingStatus == WaitingStatus.ENTERED) { // 완료된
+            throw new IllegalStateException("이미 입장 완료된 대기열입니다.");
+        }
+        if (this.waitingStatus == WaitingStatus.CANCELLED) { // 취소된
+            throw new IllegalStateException("취소된 대기열은 입장 처리할 수 없습니다.");
+        }
+        if (this.waitingStatus == WaitingStatus.EXPIRED) { // 만료된
+            throw new IllegalStateException("호출 시간이 만료된 대기열은 입장 처리할 수 없습니다.");
+        }
+    }
 
     public void cancel() {
         if (this.waitingStatus == WaitingStatus.ENTERED) {
@@ -85,6 +108,10 @@ public class WaitingQueue {
     } // 취소 될 때
 
     public void expire() {
-        this.waitingStatus = WaitingStatus.EXPIRED; // 상태 'EXPIRED'
-    } // 만료 될 때
+        if (this.waitingStatus != WaitingStatus.CALLED) { // 상태 'CALLED'
+            throw new IllegalStateException("호출 상태인 대기열만 만료 처리할 수 있습니다. 현재 상태: " + this.waitingStatus);
+        }
+
+        this.waitingStatus = WaitingStatus.EXPIRED;
+    } // 만료 될 때 (CALLED -> EXPIRED)
 }
