@@ -7,11 +7,13 @@ import com.popq.platform.entity.WaitingQueue;
 import com.popq.platform.entity.WaitingStatus;
 import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.repository.WaitingQueueRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,7 +50,7 @@ public class WaitingService {
 
         // 중복 접수 방지 (동일 팝업에 이미 등록되어 WAITING 혹은 CALLED 상태인 전화번호인지?)
         List<WaitingStatus> activeStatuses = List.of(WaitingStatus.WAITING, WaitingStatus.CALLED);
-        boolean isAlreadyWaiting = waitingQueueRepository.existsByPopupStorePopIdAndPhoneAndWaitingStatusIn(
+        boolean isAlreadyWaiting = waitingQueueRepository.existsActiveWaiting(
                 request.getPopId(), // 팝업이 같은지?
                 request.getPhone(), // 휴대폰이 같은지?
                 activeStatuses // 호출 or 대기 상태인지?
@@ -77,26 +79,26 @@ public class WaitingService {
         long teamsAhead = waitingQueueRepository.countTeamsAhead(
                 request.getPopId(),
                 WaitingStatus.WAITING, // WAITING 상태이면서
-                savedWaiting.getQueueNumber()  // 번호
+                savedWaiting.getQueueNumber(),  // 번호
+                startOfToday
         );
 
         // 응답 DTO 생성 (팀당 예상 체류 시간 DEFAULT : 5분)
         WaitingStatusResponse response = WaitingStatusResponse.of(savedWaiting, teamsAhead, 5);
 
-        // [웹소켓] 실시간 갱신
-        // [웹소켓] 고객용 개별 메시지
-        messagingTemplate.convertAndSend("/topic/waitings/" + savedWaiting.getWaitingId(), response);
-        // [웹소켓] 팝업 스토어에서 고객을 받을 때 받는 매니저/관리자용 메시지
-        messagingTemplate.convertAndSend("/topic/popups/" + request.getPopId() + "/waitings", response);
-
-        log.info("[WebSocket] 대기열 등록 실시간 메시지 발송 완료 - waitingId: {}, popId: {}",
-                savedWaiting.getWaitingId(), request.getPopId());
+        // 웹소켓
+        sendWebSocketNotification(
+                savedWaiting.getWaitingId(),
+                request.getPopId(),
+                response,
+                "대기 등록"
+        );
         // 반환
         return response;
     }
 
-    // 현재 대기 상태 조회 메소드
-    @Transactional //readonly
+    // 현재 대기 상태 조회 메소드(조회는 ReadOnly)
+    @Transactional(readOnly = true) //readonly
     public WaitingStatusResponse getWaitingStatus(Long waitingId) {
 
         // 대기열 내역 조회
@@ -106,10 +108,12 @@ public class WaitingService {
         // 내 앞 대기 팀 수 계산 (기본 0팀, 앞 팀이 현재 WAITING 상태인 경우에만 계산)
         long teamsAhead = 0;
         if (queue.getWaitingStatus() == WaitingStatus.WAITING) {
+            LocalDateTime startOfDay = queue.getJoinedAt().toLocalDate().atStartOfDay();
             teamsAhead = waitingQueueRepository.countTeamsAhead(
                     queue.getPopupStore().getPopId(),
                     WaitingStatus.WAITING,
-                    queue.getQueueNumber()
+                    queue.getQueueNumber(),
+                    startOfDay
             );
         }
 
@@ -140,11 +144,30 @@ public class WaitingService {
                 .build();
 
         // [웹소켓] 취소자 본인 + 관리자 페이지에 변경사항 반영
-        messagingTemplate.convertAndSend("/topic/waitings/" + waiting.getWaitingId(), response);
-        messagingTemplate.convertAndSend("/topic/popups/" + waiting.getPopupStore().getPopId() + "/waitings", response);
-
-        log.info("[대기 취소 완료] waitingId: {}, popId: {}", waiting.getWaitingId(), waiting.getPopupStore().getPopId());
+        sendWebSocketNotification(
+                waiting.getWaitingId(),
+                waiting.getPopupStore().getPopId(),
+                response,
+                "대기 취소"
+        );
 
         return response;
+    }
+
+    // 웹소켓 전달 메소드
+    private void sendWebSocketNotification(Long waitingId, Long popId, WaitingStatusResponse response, String actionName) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) { // TransactionSynchronizationManager에 의해 DB가 커밋이 되었는지 검증
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() { // 커밋 후 전달되도록 콜백함수 예약
+                    messagingTemplate.convertAndSend("/topic/waitings/" + waitingId, response);
+                    messagingTemplate.convertAndSend("/topic/popups/" + popId + "/waitings", response);
+                    log.info("[{}] waitingId: {}, popId: {}", actionName, waitingId, popId); // 로그 출력
+                }
+            });
+        } else { // 테스트 환경 대비 fallback
+            messagingTemplate.convertAndSend("/topic/waitings/" + waitingId, response);
+            messagingTemplate.convertAndSend("/topic/popups/" + popId + "/waitings", response);
+        }
     }
 }
