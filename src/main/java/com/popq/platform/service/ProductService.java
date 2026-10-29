@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 @Service
@@ -35,6 +36,16 @@ public class ProductService {
     // 상품 상세 조회
     public ProductResponse detailProduct(Long prdId) {
         return ProductResponse.toDto(findProduct(prdId));
+    }
+
+    // 상품 ID 목록으로 여러 상품 조회 (주문/장바구니 연동용)
+    public List<ProductResponse> listProductByIds(List<Long> prdIds) {
+        List<Product> products = productRepo.findAllById(prdIds);
+        // 중복 ID를 빼고 개수 비교 → 없는 상품이 섞여 있으면 400
+        if (products.size() != new HashSet<>(prdIds).size()) {
+            throw new IllegalArgumentException("존재하지 않는 상품이 포함되어 있습니다.");
+        }
+        return toDtoList(products);
     }
 
     // 상품 등록 : 생성된 prdId 반환
