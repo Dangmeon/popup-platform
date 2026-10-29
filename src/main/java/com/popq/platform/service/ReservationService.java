@@ -208,7 +208,6 @@ public class ReservationService {
 
         // 3. 변경 가능한 상태인지 확인
         // CONFIRMED 상태의 예약만 변경 가능
-        // TODO: INVALID_RESERVATION_STATUS 에러코드로 변경
         if (reservation.getReservationStatus() != ReservationStatus.CONFIRMED) {
             throw new ReservationException(
                     ReservationErrorCode.INVALID_RESERVATION_STATUS
@@ -295,23 +294,23 @@ public class ReservationService {
 
             // 12. 예약 인원 변경
             reservation.updateTimeSlot(newTimeSlot, request.peopleCount());
+        }else {
 
-            return ReservationResponse.fromReservation(reservation);
+            // 13. 다른 회차로 변경하는 경우 새 회차 정원 확인
+            if(newTimeSlot.getReservedCount() + request.peopleCount() > newTimeSlot.getCapacity()){
+                throw new ReservationException(ReservationErrorCode.CAPACITY_EXCEEDED);
+            }
+
+            // 14. 기존 회차에서 기존 예약 인원만큼 정원 복구
+            oldTimeSlot.decreaseReservedCount(reservation.getPeopleCount());
+
+            // 15. 새 회차에 변경할 예약 인원만큼 정원 증가
+            newTimeSlot.increaseReservedCount(request.peopleCount());
+
+            // 16. 예약의 회차 및 인원 변경
+            reservation.updateTimeSlot(newTimeSlot, request.peopleCount());
+
         }
-
-        // 13. 다른 회차로 변경하는 경우 새 회차 정원 확인
-        if(newTimeSlot.getReservedCount() + request.peopleCount() > newTimeSlot.getCapacity()){
-            throw new ReservationException(ReservationErrorCode.CAPACITY_EXCEEDED);
-        }
-
-        // 14. 기존 회차에서 기존 예약 인원만큼 정원 복구
-        oldTimeSlot.decreaseReservedCount(reservation.getPeopleCount());
-
-        // 15. 새 회차에 변경할 예약 인원만큼 정원 증가
-        newTimeSlot.increaseReservedCount(request.peopleCount());
-
-        // 16. 예약의 회차 및 인원 변경
-        reservation.updateTimeSlot(newTimeSlot, request.peopleCount());
 
         String newQrToken = UUID.randomUUID().toString();
         reservation.updateQrToken(newQrToken);
