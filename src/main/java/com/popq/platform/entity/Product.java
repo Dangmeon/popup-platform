@@ -56,7 +56,7 @@ public class Product {
     private Integer maxQty;
 
     // Request -> Entity 변환시 사용
-    // 등록 : prdId = null, stock = 요청값 / 수정 : prdId = 수정할 상품 번호, stock = DB 값 그대로
+    // 등록할 때만 사용 : prdId = null, stock = 요청값 (수정은 아래 update() 사용)
     public static Product toEntity(Long prdId, PopupStore popupStore, ProductRequest request, Integer stock) {
         return Product.builder()
                 .prdId(prdId)
@@ -71,5 +71,20 @@ public class Product {
                 .productDesc(request.getProductDesc())
                 .maxQty(request.getMaxQty() != null ? request.getMaxQty() : 1) // 비우면 1개
                 .build();
+    }
+
+    // 상품 수정 : 수정 가능한 칸만 변경 (팝업, 재고는 바꾸지 않음)
+    // DB에서 조회한 객체의 값을 바꾸면 트랜잭션이 끝날 때 JPA가 변경을 감지해서 자동으로 UPDATE
+    public void update(ProductRequest request) {
+        this.productName = request.getProductName();
+        this.price = request.getPrice();
+        this.saleStart = request.getSaleStart();
+        this.saleEnd = request.getSaleEnd();
+        this.category = request.getCategory();
+        this.productImg = request.getProductImg();
+        this.productDesc = request.getProductDesc();
+        if (request.getMaxQty() != null) { // 비우면 기존 값 유지
+            this.maxQty = request.getMaxQty();
+        }
     }
 }

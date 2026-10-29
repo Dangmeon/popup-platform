@@ -65,11 +65,7 @@ public class ProductService {
         }
         checkProduct(popup, request);
         checkSalePeriodChange(product, request);
-        // 구매 제한을 비우면 기존 값 유지 (toEntity에서 1로 초기화되지 않도록)
-        if (request.getMaxQty() == null) {
-            request.setMaxQty(product.getMaxQty());
-        }
-        productRepo.save(Product.toEntity(prdId, popup, request, product.getStock())); // stock은 updatable=false
+        product.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE
     }
 
     // 재고 조정 : quantity 양수면 추가, 음수면 차감 / 조정 후 재고 반환
