@@ -105,8 +105,10 @@ public class WaitingService {
         WaitingQueue queue = waitingQueueRepository.findById(waitingId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId)); // 없으면 예외 던지기
 
-        // 내 앞 대기 팀 수 계산 (기본 0팀, 앞 팀이 현재 WAITING 상태인 경우에만 계산)
-        long teamsAhead = 0;
+        Long teamsAhead = null;
+        Integer minutesPerTeam = null;
+
+        // 내 앞 대기 팀 수 계산 (기본 null값, 앞 팀이 현재 WAITING 상태인 경우에만 계산)
         if (queue.getWaitingStatus() == WaitingStatus.WAITING) {
             LocalDateTime startOfDay = queue.getJoinedAt().toLocalDate().atStartOfDay();
             teamsAhead = waitingQueueRepository.countTeamsAhead(
@@ -132,16 +134,9 @@ public class WaitingService {
         // 검증 및 CANCELLED로 상태 변경
         waiting.cancel();
 
-        // 취소 상태 응답 DTO 생성 (취소되었으므로 앞 팀 수와 예상 대기 시간은 0으로 초기화)
-        WaitingStatusResponse response = WaitingStatusResponse.builder()
-                .waitingId(waiting.getWaitingId())
-                .popId(waiting.getPopupStore().getPopId())
-                .queueNumber(waiting.getQueueNumber())
-                .teamsAhead(0)
-                .estimatedWaitMins(0)
-                .status(waiting.getWaitingStatus())
-                .joinedAt(waiting.getJoinedAt())
-                .build();
+        // 취소 상태 응답 DTO 생성 (취소되었으므로 앞 팀 수와 예상 대기 시간은 null로)
+        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, null, null);
+
 
         // [웹소켓] 취소자 본인 + 관리자 페이지에 변경사항 반영
         sendWebSocketNotification(
@@ -150,7 +145,6 @@ public class WaitingService {
                 response,
                 "대기 취소"
         );
-
         return response;
     }
 
@@ -166,8 +160,8 @@ public class WaitingService {
         // 엔티티 상태 전이 (규칙 검증(WAITING 인지?) 및 calledAt, expiresAt 시각 설정)
         waiting.call(timeoutMinutes);
 
-        // 응답 DTO 생성 (호출 상태(앞에 아무도 없는 상태)는 앞 대기 팀 수와 대기 시간은 0 처리)
-        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, 0, 0);
+        // 응답 DTO 생성 (호출 상태(앞에 아무도 없는 상태)는 앞 대기 팀 수와 대기 시간은 null 처리)
+        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, null, null);
 
         // [웹소켓]
         // - 고객: 입장 안내 팝업 유도
@@ -194,7 +188,7 @@ public class WaitingService {
         waiting.enter();
 
         // 응답 DTO 생성
-        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, 0, 0);
+        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, null, null);
 
         // [웹소켓]
         // - 고객 개인 채널: '입장 완료' 처리
