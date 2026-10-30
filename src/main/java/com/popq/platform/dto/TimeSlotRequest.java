@@ -10,7 +10,6 @@ import java.time.LocalDate;
 @Setter
 @NoArgsConstructor
 public class TimeSlotRequest {
-    private Long popId;
     private Integer slotNum;
     private LocalDate slotDate;
     private String startTime;

@@ -60,7 +60,7 @@ public class PopupStore {
     private String walkinStatus;
 
     // Request -> Entity 변환시 사용
-    // 등록 : popId = null (시퀀스가 번호 생성) / 수정 : popId = 수정할 팝업 번호
+    // 등록할 때만 사용 : popId = null (시퀀스가 번호 생성) / 수정은 아래 update() 사용
     public static PopupStore toEntity(Long popId, PopupStoreRequest request) {
         return PopupStore.builder()
             .popId(popId)
@@ -77,5 +77,25 @@ public class PopupStore {
             .reservPeopleCap(request.getReservPeopleCap())
             .walkinStatus(request.getWalkinStatus() != null ? request.getWalkinStatus() : "OPEN")
             .build();
+    }
+
+    // 팝업 수정 : DB에서 조회한 객체의 값을 바꾸면 트랜잭션이 끝날 때 JPA가 변경을 감지해서 자동으로 UPDATE
+    public void update(PopupStoreRequest request) {
+        this.title = request.getTitle();
+        this.location = request.getLocation();
+        this.startDate = request.getStartDate();
+        this.endDate = request.getEndDate();
+        this.description = request.getDescription();
+        this.storeImg = request.getStoreImg();
+        this.roundNum = request.getRoundNum();
+        this.reservStart = request.getReservStart();
+        this.reservEnd = request.getReservEnd();
+        this.reservPeopleCap = request.getReservPeopleCap();
+        if (request.getCategory() != null) { // 비우면 기존 값 유지
+            this.category = request.getCategory();
+        }
+        if (request.getWalkinStatus() != null) { // 비우면 기존 값 유지
+            this.walkinStatus = request.getWalkinStatus();
+        }
     }
 }
