@@ -16,7 +16,7 @@ public class MemberInfoResponse {
     private String role;
     private String createdAt;
 
-    // Entity를 DTO로 변환하는 정적 메서드
+
     public static MemberInfoResponse from(User user) {
         String formattedCreatedAt = "";
         if (user.getCreatedAt() != null) {

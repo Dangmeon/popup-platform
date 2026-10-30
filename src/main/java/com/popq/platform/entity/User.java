@@ -52,4 +52,13 @@ public class User {
     public void updatePassword(String password) {
         this.password = password;
     }
+
+    public void updateMemberInfo(String name, String phone) {
+        if (name != null && !name.isBlank()) {
+            this.name = name;
+        }
+        if (phone != null && !phone.isBlank()) {
+            this.phone = phone;
+        }
+    }
 }

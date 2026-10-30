@@ -1,10 +1,7 @@
 package com.popq.platform.service;
 
 import com.popq.platform.config.JwtTokenProvider;
-import com.popq.platform.dto.LoginRequest;
-import com.popq.platform.dto.MemberInfoResponse;
-import com.popq.platform.dto.PasswordFindRequest;
-import com.popq.platform.dto.SignupRequest;
+import com.popq.platform.dto.*;
 import com.popq.platform.entity.Role;
 import com.popq.platform.entity.User;
 import com.popq.platform.repository.UserRepository;
@@ -89,6 +86,25 @@ public class UserService {
         User user = userRepository.findByUsername(email)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
 
+        return MemberInfoResponse.from(user);
+    }
+
+    // 회원 정보 및 비밀번호 수정 로직
+    @Transactional
+    public MemberInfoResponse updateMyInfo(String email, MemberUpdateRequest requestDto) {
+        User user = userRepository.findByUsername(email)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+
+        // 이름 및 전화번호 수정 (Entity에 해당 메서드가 구현되어 있어야 합니다)
+        user.updateMemberInfo(requestDto.getName(), requestDto.getPhone());
+
+        // 비밀번호 수정 요청이 있는 경우 암호화 후 반영
+        if (requestDto.getPassword() != null && !requestDto.getPassword().isBlank()) {
+            String encodedPassword = passwordEncoder.encode(requestDto.getPassword());
+            user.updatePassword(encodedPassword);
+        }
+
+        // 수정된 회원 정보를 담아 응답 DTO 반환
         return MemberInfoResponse.from(user);
     }
 }
