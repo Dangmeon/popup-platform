@@ -98,4 +98,9 @@ public class PopupStore {
             this.walkinStatus = request.getWalkinStatus();
         }
     }
+
+    // 웨이팅 상태 변경 : OPEN(접수 중) / PAUSED(일시 중지) / CLOSED(마감)
+    public void changeWalkinStatus(String walkinStatus) {
+        this.walkinStatus = walkinStatus;
+    }
 }
