@@ -49,23 +49,24 @@ public class TimeSlotService {
         return TimeSlotResponse.toDto(findTimeSlot(timeSlotId));
     }
 
+    // 회차 1개 등록 : 등록된 회차 정보 반환
     @Transactional
-    public Long insertTimeSlot(TimeSlotRequest request) {
-        PopupStore popup = findPopup(request.getPopId());
+    public TimeSlotResponse insertTimeSlot(Long popId, TimeSlotRequest request) { // popId는 URL에서 받음
+        PopupStore popup = findPopup(popId);
         checkTimeSlot(popup, request);
         if (timeSlotRepo.existsByPopupStore_PopIdAndSlotDateAndStartTime(
                 popup.getPopId(), request.getSlotDate(), request.getStartTime())) {
             throw new IllegalArgumentException("같은 날짜, 같은 시작 시간의 회차가 이미 있습니다.");
         }
         TimeSlot saved = timeSlotRepo.save(TimeSlot.toEntity(null, popup, request, 0));
-        return saved.getTimeSlotId();
+        return TimeSlotResponse.toDto(saved); // timeSlotId 대신 회차 정보 전체 반환
     }
 
     // 자동 생성 : 생성된 개수 반환
     // 예) 10:00~16:00, 60분, 점심 12:30~13:30 → 10:00, 11:00, 13:30, 14:30
     @Transactional
-    public int generateTimeSlots(TimeSlotGenerateRequest request) {
-        PopupStore popup = findPopup(request.getPopId());
+    public int generateTimeSlots(Long popId, TimeSlotGenerateRequest request) { // popId는 URL에서 받음
+        PopupStore popup = findPopup(popId);
         fillDefaults(popup, request);
         checkGenerate(popup, request);
 
@@ -99,7 +100,7 @@ public class TimeSlotService {
                 popup.getPopId(), request.getSlotDate(), request.getStartTime(), timeSlotId)) {
             throw new IllegalArgumentException("같은 날짜, 같은 시작 시간의 회차가 이미 있습니다.");
         }
-        timeSlotRepo.save(TimeSlot.toEntity(timeSlotId, popup, request, slot.getReservedCount()));
+        slot.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE (예약 인원은 그대로)
     }
 
     // 예약이 있거나 예약 이력이 있으면 삭제 불가
