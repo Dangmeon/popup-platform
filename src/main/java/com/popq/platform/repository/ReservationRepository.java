@@ -34,4 +34,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("status") ReservationStatus status,
             @Param("now") LocalDateTime now
     );
+
+    // 해당 회차에 예약 이력이 하나라도 존재하는지 확인
+    boolean existsByTimeSlot_TimeSlotId(Long timeSlotId);
 }
