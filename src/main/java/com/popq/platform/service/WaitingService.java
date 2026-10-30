@@ -117,10 +117,11 @@ public class WaitingService {
                     queue.getQueueNumber(),
                     startOfDay
             );
+            minutesPerTeam = 5; // waiting일 때만 예상 대기시간 5분 할당
         }
 
         // 현재 상태 DTO 반환
-        return WaitingStatusResponse.of(queue, teamsAhead, 5);
+        return WaitingStatusResponse.of(queue, teamsAhead, minutesPerTeam);
     }
 
     // 대기열 취소 메소드
