@@ -8,6 +8,7 @@ import com.popq.platform.repository.ProductRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -42,23 +43,23 @@ public class PopupStoreService {
         return toDtoList(popupRepo.findByCategoryOrderByStartDateDesc(category));
     }
 
-    // 팝업 등록 : 생성된 popId 반환
-    public Long insertPopup(PopupStoreRequest request) {
+    // 팝업 등록 : 등록된 팝업 정보 반환
+    @Transactional
+    public PopupStoreResponse insertPopup(PopupStoreRequest request) {
         checkPeriod(request);
         checkReservTime(request);
         PopupStore saved = popupRepo.save(PopupStore.toEntity(null, request)); // popId가 null이면 insert
-        return saved.getPopId();
+        return PopupStoreResponse.toDto(saved);
     }
 
-    // 팝업 수정
+    // 팝업 수정 : 조회한 팝업의 값을 바꾸면 트랜잭션 끝날 때 자동 UPDATE (save 호출 X)
+    @Transactional
     public void updatePopup(Long popId, PopupStoreRequest request) {
-        // DB에 없는 번호면 save()가 insert를 해버리므로 먼저 확인
-        if (!popupRepo.existsById(popId)) {
-            throw new IllegalArgumentException("존재하지 않는 팝업입니다. popId=" + popId);
-        }
+        PopupStore popup = popupRepo.findById(popId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팝업입니다. popId=" + popId));
         checkPeriod(request);
         checkReservTime(request);
-        popupRepo.save(PopupStore.toEntity(popId, request)); // popId가 있으면 update
+        popup.update(request);
     }
 
     // 팝업 삭제
