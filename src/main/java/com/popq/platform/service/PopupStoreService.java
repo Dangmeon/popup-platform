@@ -46,8 +46,10 @@ public class PopupStoreService {
     // 팝업 등록 : 등록된 팝업 정보 반환
     @Transactional
     public PopupStoreResponse insertPopup(PopupStoreRequest request) {
+        checkRequired(request);
         checkPeriod(request);
         checkReservTime(request);
+        checkWalkinStatus(request.getWalkinStatus());
         PopupStore saved = popupRepo.save(PopupStore.toEntity(null, request)); // popId가 null이면 insert
         return PopupStoreResponse.toDto(saved);
     }
@@ -57,9 +59,21 @@ public class PopupStoreService {
     public void updatePopup(Long popId, PopupStoreRequest request) {
         PopupStore popup = popupRepo.findById(popId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팝업입니다. popId=" + popId));
+        checkRequired(request);
         checkPeriod(request);
         checkReservTime(request);
+        checkWalkinStatus(request.getWalkinStatus());
         popup.update(request);
+    }
+
+    // 웨이팅 상태 변경 : 변경된 팝업 정보 반환
+    @Transactional
+    public PopupStoreResponse changeWalkinStatus(Long popId, String walkinStatus) {
+        PopupStore popup = popupRepo.findById(popId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팝업입니다. popId=" + popId));
+        checkWalkinStatus(walkinStatus);
+        popup.changeWalkinStatus(walkinStatus);
+        return PopupStoreResponse.toDto(popup);
     }
 
     // 팝업 삭제
@@ -89,6 +103,23 @@ public class PopupStoreService {
             dtoList.add(PopupStoreResponse.toDto(e));
         }
         return dtoList;
+    }
+
+    // 필수값 체크 : 회차 생성에서 운영기간을 사용하므로 시작일, 종료일은 반드시 필요
+    private void checkRequired(PopupStoreRequest request) {
+        if (request.getTitle() == null || request.getTitle().isBlank()
+                || request.getLocation() == null || request.getLocation().isBlank()
+                || request.getStartDate() == null || request.getEndDate() == null) {
+            throw new IllegalArgumentException("title, location, startDate, endDate는 필수입니다.");
+        }
+    }
+
+    // 웨이팅 상태 체크 : OPEN / PAUSED / CLOSED 만 가능 (비우면 등록은 OPEN, 수정은 기존 값 유지)
+    private void checkWalkinStatus(String walkinStatus) {
+        if (walkinStatus != null && !walkinStatus.equals("OPEN")
+                && !walkinStatus.equals("PAUSED") && !walkinStatus.equals("CLOSED")) {
+            throw new IllegalArgumentException("웨이팅 상태는 OPEN, PAUSED, CLOSED 중 하나여야 합니다.");
+        }
     }
 
     // 운영기간 체크 : 종료일이 시작일보다 빠르면 안 됨

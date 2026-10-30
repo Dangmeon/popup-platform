@@ -64,4 +64,11 @@ public class PopupStoreController {
     public void deletePopup(@PathVariable("popId") Long popId) {
         service.deletePopup(popId);
     }
+
+    // 웨이팅 상태 변경 : /api/admin/popups/{popId}/walkin-status?status=PAUSED
+    @PatchMapping("/api/admin/popups/{popId}/walkin-status")
+    public PopupStoreResponse changeWalkinStatus(@PathVariable("popId") Long popId,
+                                                 @RequestParam("status") String status) {
+        return service.changeWalkinStatus(popId, status);
+    }
 }
