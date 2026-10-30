@@ -60,9 +60,6 @@ public class ProductService {
     public void updateProduct(Long prdId, ProductRequest request) {
         Product product = findProduct(prdId);
         PopupStore popup = product.getPopupStore();
-        if (request.getPopId() != null && !request.getPopId().equals(popup.getPopId())) {
-            throw new IllegalArgumentException("상품의 팝업은 변경할 수 없습니다.");
-        }
         checkProduct(popup, request);
         checkSalePeriodChange(product, request);
         product.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE

@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 public class ProductRequest {
-    private Long popId;
     private String productName;
     private Integer price;
     private Integer stock;            // 등록할 때만 사용 (수정 시 무시)
