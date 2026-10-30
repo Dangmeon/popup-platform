@@ -42,17 +42,17 @@ public class ProductService {
         return toDtoList(productRepo.findAllById(prdIds));
     }
 
-    // 상품 등록 : 생성된 prdId 반환
+    // 상품 등록 : 등록된 상품 정보 반환
     @Transactional
-    public Long insertProduct(ProductRequest request) {
-        PopupStore popup = findPopup(request.getPopId());
+    public ProductResponse insertProduct(Long popId, ProductRequest request) {
+        PopupStore popup = findPopup(popId);
         checkProduct(popup, request);
         // DB에 DEFAULT 0이 있어도 JPA는 null을 그대로 INSERT 하므로 여기서 확인
         if (request.getStock() == null || request.getStock() < 0) {
             throw new IllegalArgumentException("재고는 0개 이상 입력해주세요.");
         }
         Product saved = productRepo.save(Product.toEntity(null, popup, request, request.getStock()));
-        return saved.getPrdId();
+        return ProductResponse.toDto(saved); // prdId 대신 상품 정보 전체 반환
     }
 
     // 상품 수정 : 팝업은 바꿀 수 없고, 재고는 수정되지 않음 (재고 조정 API 사용)
@@ -68,9 +68,9 @@ public class ProductService {
         product.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE
     }
 
-    // 재고 조정 : quantity 양수면 추가, 음수면 차감 / 조정 후 재고 반환
+    // 재고 조정 : quantity 양수면 추가, 음수면 차감 / 조정 후 상품 정보 반환
     @Transactional
-    public Integer adjustStock(Long prdId, Integer quantity) {
+    public ProductResponse adjustStock(Long prdId, Integer quantity) {
         if (quantity == null || quantity == 0) {
             throw new IllegalArgumentException("조정 수량을 입력해주세요. 예) 10 (추가) / -5 (차감)");
         }
@@ -91,7 +91,7 @@ public class ProductService {
             findProduct(prdId); // 없는 상품이면 여기서 "존재하지 않는 상품" 예외
             throw new IllegalArgumentException("현재 재고보다 많이 차감할 수 없습니다.");
         }
-        return findProduct(prdId).getStock(); // UPDATE 후 영속성 컨텍스트가 비워져서 DB에서 다시 조회됨
+        return ProductResponse.toDto(findProduct(prdId)); // UPDATE 후 영속성 컨텍스트가 비워져서 DB에서 다시 조회됨
     }
 
     // 상품 삭제 : 주문 내역이 있으면 삭제 불가 (order_item FK)

@@ -19,42 +19,40 @@ public class ProductController {
     }
 
     // 팝업의 상품 목록 조회
-    // /product/list/1 : 1번 팝업의 상품 전체 (등록순)
-    @GetMapping("/product/list/{popId}")
+    @GetMapping("/api/popups/{popId}/products")
     public List<ProductResponse> listProduct(@PathVariable("popId") Long popId) {
         return service.listProduct(popId);
     }
 
     // 상품 상세 조회
-    @GetMapping("/product/detail/{prdId}")
+    @GetMapping("/api/products/{prdId}")
     public ProductResponse detailProduct(@PathVariable("prdId") Long prdId) {
         return service.detailProduct(prdId);
     }
 
-    // [회원 연동] 아래 등록/수정/재고 조정/삭제는 관리자(ADMIN)만 호출 가능하도록 권한 체크 필요
-    //  - Security/ADMIN 권한 작업 후 적용
+    // 아래 등록/수정/재고 조정/삭제는 /api/admin/** 이라 SecurityConfig에서 ADMIN만 호출 가능
 
     // 상품 등록
-    @PostMapping("/product/insert")
-    public Long insertProduct(@RequestBody ProductRequest request) {
-        return service.insertProduct(request); // 생성된 prdId 반환
+    @PostMapping("/api/admin/popups/{popId}/products")
+    public ProductResponse insertProduct(@PathVariable("popId") Long popId, @RequestBody ProductRequest request) {
+        return service.insertProduct(popId, request); // 등록된 상품 정보 반환
     }
 
     // 상품 수정 (재고는 수정되지 않음, 판매 시작 후에는 판매 시작일시 변경 불가)
-    @PutMapping("/product/update/{prdId}")
+    @PutMapping("/api/admin/products/{prdId}")
     public void updateProduct(@PathVariable("prdId") Long prdId, @RequestBody ProductRequest request) {
         service.updateProduct(prdId, request);
     }
 
-    // 재고 조정 : body 대신 URL 파라미터로 받음
-    // /product/stock/1?quantity=10 추가 / ?quantity=-5 차감 (판매 시작 후에는 추가만 가능)
-    @PutMapping("/product/stock/{prdId}")
-    public Integer adjustStock(@PathVariable("prdId") Long prdId, @RequestParam("quantity") Integer quantity) {
-        return service.adjustStock(prdId, quantity); // 조정 후 재고 반환
+    // 재고 조정
+    // /api/admin/products/1/stock?quantity=10 추가 / ?quantity=-5 차감 (판매 시작 후에는 추가만 가능)
+    @PutMapping("/api/admin/products/{prdId}/stock")
+    public ProductResponse adjustStock(@PathVariable("prdId") Long prdId, @RequestParam("quantity") Integer quantity) {
+        return service.adjustStock(prdId, quantity); // 조정 후 상품 정보 반환
     }
 
     // 상품 삭제
-    @DeleteMapping("/product/delete/{prdId}")
+    @DeleteMapping("/api/admin/products/{prdId}")
     public void deleteProduct(@PathVariable("prdId") Long prdId) {
         service.deleteProduct(prdId);
     }
