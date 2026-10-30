@@ -4,6 +4,7 @@ import com.popq.platform.dto.PopupStoreRequest;
 import com.popq.platform.dto.PopupStoreResponse;
 import com.popq.platform.entity.PopupStore;
 import com.popq.platform.repository.PopupStoreRepository;
+import com.popq.platform.repository.ProductRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,11 +18,13 @@ public class PopupStoreService {
 
     PopupStoreRepository popupRepo;
     TimeSlotRepository timeSlotRepo;
+    ProductRepository productRepo;
 
     @Autowired
-    public PopupStoreService(PopupStoreRepository popupRepo, TimeSlotRepository timeSlotRepo) {
+    public PopupStoreService(PopupStoreRepository popupRepo, TimeSlotRepository timeSlotRepo, ProductRepository productRepo) {
         this.popupRepo = popupRepo;
         this.timeSlotRepo = timeSlotRepo;
+        this.productRepo = productRepo;
     }
 
     // 전체 팝업 조회
@@ -63,6 +66,9 @@ public class PopupStoreService {
         // 회차가 등록된 팝업은 FK 때문에 삭제 불가 -> 500 대신 400 메시지로 안내
         if (timeSlotRepo.existsByPopupStore_PopId(popId)) {
             throw new IllegalArgumentException("회차가 등록된 팝업은 삭제할 수 없습니다. 회차를 먼저 삭제해주세요.");
+        }
+        if (productRepo.existsByPopupStore_PopId(popId)) {
+            throw new IllegalArgumentException("상품이 등록된 팝업은 삭제할 수 없습니다. 상품을 먼저 삭제해주세요.");
         }
         popupRepo.deleteById(popId);
     }
