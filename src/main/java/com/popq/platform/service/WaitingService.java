@@ -203,6 +203,33 @@ public class WaitingService {
 
         return response;
     }
+    // 자동 만료 처리 (CALLED -> EXPIRED) 입장 호출 먼저 구현 후(1차 프로토타입 이후) 이어서 제작 예정
+    @Transactional
+    public void expireWaitings(LocalDateTime now) {
+        // CALLED 상태이면서 입장 제한 시각(expiresAt)이 지난 건 조회
+        List<WaitingQueue> expiredList = waitingQueueRepository.findExpiredWaitings(WaitingStatus.CALLED, now);
+
+        if (expiredList.isEmpty()) {
+            return;
+        }
+
+        // 일괄 상태 전이 및 웹소켓 알림 발송
+        for (WaitingQueue waiting : expiredList) {
+            waiting.expire();
+
+            // 만료 상태이므로 teamsAhead, estimatedWaitMins는 null
+            WaitingStatusResponse response = WaitingStatusResponse.of(waiting, null, null);
+
+            sendWebSocketNotification(
+                    waiting.getWaitingId(),
+                    waiting.getPopupStore().getPopId(),
+                    response,
+                    "대기 시간 초과 만료"
+            );
+        }
+
+        log.info("[스케줄러] 총 {}건의 대기가 입장 시간 초과로 EXPIRED 처리되었습니다.", expiredList.size());
+    }
 
     // 웹소켓 전달 메소드
     private void sendWebSocketNotification(Long waitingId, Long popId, WaitingStatusResponse response, String actionName) {

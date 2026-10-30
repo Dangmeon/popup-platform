@@ -111,7 +111,6 @@ public class WaitingQueue {
         if (this.waitingStatus != WaitingStatus.CALLED) { // 상태 'CALLED'
             throw new IllegalStateException("호출 상태인 대기열만 만료 처리할 수 있습니다. 현재 상태: " + this.waitingStatus);
         }
-
         this.waitingStatus = WaitingStatus.EXPIRED;
     } // 만료 될 때 (CALLED -> EXPIRED)
 }
