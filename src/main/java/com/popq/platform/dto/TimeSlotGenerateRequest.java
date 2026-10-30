@@ -10,7 +10,6 @@ import java.time.LocalDate;
 @Setter
 @NoArgsConstructor
 public class TimeSlotGenerateRequest {
-    private Long popId;
     private LocalDate startDate;     // 비우면 팝업 운영 시작일
     private LocalDate endDate;       // 비우면 팝업 운영 종료일
     private Integer intervalMinutes; // 회차 간격(분), 비우면 60분

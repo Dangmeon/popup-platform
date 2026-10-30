@@ -52,20 +52,30 @@ public class TimeSlot {
     @Column(name = "reserved_count")
     private Integer reservedCount;
 
-    // Request -> Entity 변환시 사용
-    // 등록 : timeSlotId = null, reservedCount = 0
-    // 수정 : timeSlotId = 수정할 회차 번호, reservedCount = DB에 있던 값 그대로 (덮어쓰면 안 됨)
+    // Request -> Entity 변환시 사용 (등록할 때만 사용 : timeSlotId = null, reservedCount = 0 / 수정은 아래 update() 사용)
     public static TimeSlot toEntity(Long timeSlotId, PopupStore popupStore, TimeSlotRequest request, Integer reservedCount) {
         return TimeSlot.builder()
-            .timeSlotId(timeSlotId)
-            .popupStore(popupStore)
-            .slotNum(request.getSlotNum())
-            .slotDate(request.getSlotDate())
-            .startTime(request.getStartTime())
-            .endTime(request.getEndTime())
-            .capacity(request.getCapacity())
-            .reservedCount(reservedCount)
-            .build();
+                .timeSlotId(timeSlotId)
+                .popupStore(popupStore)
+                .slotNum(request.getSlotNum())
+                .slotDate(request.getSlotDate())
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .capacity(request.getCapacity())
+                .reservedCount(reservedCount)
+                .build();
+    }
+
+    // 회차 수정 : 날짜, 시간, 정원, 회차 번호만 변경 (팝업, 예약 인원은 바꾸지 않음)
+    // DB에서 조회한 객체의 값을 바꾸면 트랜잭션이 끝날 때 JPA가 변경을 감지해서 자동으로 UPDATE
+    public void update(TimeSlotRequest request) {
+        this.slotDate = request.getSlotDate();
+        this.startTime = request.getStartTime();
+        this.endTime = request.getEndTime();
+        this.capacity = request.getCapacity();
+        if (request.getSlotNum() != null) { // 비우면 기존 값 유지
+            this.slotNum = request.getSlotNum();
+        }
     }
 
     // [예약 연동] 예약 인원 증가 / 감소
