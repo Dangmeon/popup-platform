@@ -2,6 +2,7 @@ package com.popq.platform.service;
 
 import com.popq.platform.config.JwtTokenProvider;
 import com.popq.platform.dto.LoginRequest;
+import com.popq.platform.dto.MemberInfoResponse;
 import com.popq.platform.dto.PasswordFindRequest;
 import com.popq.platform.dto.SignupRequest;
 import com.popq.platform.entity.Role;
@@ -80,5 +81,14 @@ public class UserService {
         message.setText("안녕하세요,\n\n요청하신 임시 비밀번호는 [ " + tempPassword + " ] 입니다.\n로그인 후 반드시 비밀번호를 변경해 주세요.");
 
         mailSender.send(message);
+    }
+
+    // 회원 정보 조회 로직
+    @Transactional(readOnly = true)
+    public MemberInfoResponse getMyInfo(String email) {
+        User user = userRepository.findByUsername(email)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+
+        return MemberInfoResponse.from(user);
     }
 }

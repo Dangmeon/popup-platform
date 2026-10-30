@@ -28,10 +28,10 @@ public class AuthController {
         return ResponseEntity.ok(token);
     }
 
-    @PostMapping("/find-password")
+    @PutMapping("/password/reset")
     public ResponseEntity<String> findPassword(@RequestBody @Valid PasswordFindRequest requestDto) {
         userService.findPassword(requestDto);
-        return ResponseEntity.ok("임시 비밀번호가 발급되었습니다.");
+        return ResponseEntity.ok("임시 비밀번호가 이메일로 발송되었습니다.");
     }
 
     @GetMapping("/test")
