@@ -48,7 +48,7 @@ public class ProductResponse {
         if (entity.getSaleStart() != null && now.isBefore(entity.getSaleStart())) {
             return "UPCOMING";
         }
-        if (entity.getSaleEnd() != null && now.isAfter(entity.getSaleEnd())) {
+        if (entity.getSaleEnd() != null && !now.isBefore(entity.getSaleEnd())) {
             return "ENDED";
         }
         return entity.getStock() > 0 ? "ON_SALE" : "SOLD_OUT";
