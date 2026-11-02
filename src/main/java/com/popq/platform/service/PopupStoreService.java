@@ -3,6 +3,8 @@ package com.popq.platform.service;
 import com.popq.platform.dto.PopupStoreRequest;
 import com.popq.platform.dto.PopupStoreResponse;
 import com.popq.platform.entity.PopupStore;
+import com.popq.platform.exception.PopupErrorCode;
+import com.popq.platform.exception.PopupException;
 import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.repository.ProductRepository;
 import com.popq.platform.repository.TimeSlotRepository;
@@ -58,7 +60,7 @@ public class PopupStoreService {
     @Transactional
     public void updatePopup(Long popId, PopupStoreRequest request) {
         PopupStore popup = popupRepo.findById(popId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팝업입니다. popId=" + popId));
+                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
         checkRequired(request);
         checkPeriod(request);
         checkReservTime(request);
@@ -70,7 +72,7 @@ public class PopupStoreService {
     @Transactional
     public PopupStoreResponse changeWalkinStatus(Long popId, String walkinStatus) {
         PopupStore popup = popupRepo.findById(popId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팝업입니다. popId=" + popId));
+                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
         checkWalkinStatus(walkinStatus);
         popup.changeWalkinStatus(walkinStatus);
         return PopupStoreResponse.toDto(popup);
@@ -78,12 +80,12 @@ public class PopupStoreService {
 
     // 팝업 삭제
     public void deletePopup(Long popId) {
-        // 회차가 등록된 팝업은 FK 때문에 삭제 불가 -> 500 대신 400 메시지로 안내
+        // 회차가 등록된 팝업은 FK 때문에 삭제 불가 -> 500 대신 409 메시지로 안내
         if (timeSlotRepo.existsByPopupStore_PopId(popId)) {
-            throw new IllegalArgumentException("회차가 등록된 팝업은 삭제할 수 없습니다. 회차를 먼저 삭제해주세요.");
+            throw new PopupException(PopupErrorCode.POPUP_HAS_TIMESLOTS);
         }
         if (productRepo.existsByPopupStore_PopId(popId)) {
-            throw new IllegalArgumentException("상품이 등록된 팝업은 삭제할 수 없습니다. 상품을 먼저 삭제해주세요.");
+            throw new PopupException(PopupErrorCode.POPUP_HAS_PRODUCTS);
         }
         popupRepo.deleteById(popId);
     }
@@ -92,7 +94,7 @@ public class PopupStoreService {
     public PopupStoreResponse detailViewPopup(Long popId) {
         // select * from popup_store where pop_id = popId
         PopupStore entity = popupRepo.findById(popId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팝업입니다. popId=" + popId));
+                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
         return PopupStoreResponse.toDto(entity);
     }
 
@@ -110,7 +112,7 @@ public class PopupStoreService {
         if (request.getTitle() == null || request.getTitle().isBlank()
                 || request.getLocation() == null || request.getLocation().isBlank()
                 || request.getStartDate() == null || request.getEndDate() == null) {
-            throw new IllegalArgumentException("title, location, startDate, endDate는 필수입니다.");
+            throw new PopupException(PopupErrorCode.POPUP_REQUIRED_FIELD);
         }
     }
 
@@ -118,7 +120,7 @@ public class PopupStoreService {
     private void checkWalkinStatus(String walkinStatus) {
         if (walkinStatus != null && !walkinStatus.equals("OPEN")
                 && !walkinStatus.equals("PAUSED") && !walkinStatus.equals("CLOSED")) {
-            throw new IllegalArgumentException("웨이팅 상태는 OPEN, PAUSED, CLOSED 중 하나여야 합니다.");
+            throw new PopupException(PopupErrorCode.INVALID_WALKIN_STATUS);
         }
     }
 
@@ -126,7 +128,7 @@ public class PopupStoreService {
     private void checkPeriod(PopupStoreRequest request) {
         if (request.getStartDate() != null && request.getEndDate() != null
                 && request.getStartDate().isAfter(request.getEndDate())) {
-            throw new IllegalArgumentException("종료일은 시작일보다 빠를 수 없습니다.");
+            throw new PopupException(PopupErrorCode.INVALID_POPUP_PERIOD);
         }
     }
 
@@ -137,14 +139,14 @@ public class PopupStoreService {
         String end = request.getReservEnd();
 
         if (start != null && !start.matches(timeRegex)) {
-            throw new IllegalArgumentException("예약 시작 시간은 HH:mm 형식이어야 합니다. 예) 10:00");
+            throw new PopupException(PopupErrorCode.INVALID_RESERV_TIME_FORMAT);
         }
         if (end != null && !end.matches(timeRegex)) {
-            throw new IllegalArgumentException("예약 종료 시간은 HH:mm 형식이어야 합니다. 예) 20:00");
+            throw new PopupException(PopupErrorCode.INVALID_RESERV_TIME_FORMAT);
         }
         // 두 자리 형식이 보장되면 문자열 비교로 시간 순서를 판단할 수 있음
         if (start != null && end != null && start.compareTo(end) >= 0) {
-            throw new IllegalArgumentException("예약 종료 시간은 시작 시간보다 늦어야 합니다.");
+            throw new PopupException(PopupErrorCode.INVALID_RESERV_TIME_RANGE);
         }
     }
 }

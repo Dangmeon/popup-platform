@@ -4,6 +4,10 @@ import com.popq.platform.dto.ProductRequest;
 import com.popq.platform.dto.ProductResponse;
 import com.popq.platform.entity.PopupStore;
 import com.popq.platform.entity.Product;
+import com.popq.platform.exception.PopupErrorCode;
+import com.popq.platform.exception.PopupException;
+import com.popq.platform.exception.ProductErrorCode;
+import com.popq.platform.exception.ProductException;
 import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +53,7 @@ public class ProductService {
         checkProduct(popup, request);
         // DB에 DEFAULT 0이 있어도 JPA는 null을 그대로 INSERT 하므로 여기서 확인
         if (request.getStock() == null || request.getStock() < 0) {
-            throw new IllegalArgumentException("재고는 0개 이상 입력해주세요.");
+            throw new ProductException(ProductErrorCode.INVALID_STOCK);
         }
         Product saved = productRepo.save(Product.toEntity(null, popup, request, request.getStock()));
         return ProductResponse.toDto(saved); // prdId 대신 상품 정보 전체 반환
@@ -69,13 +73,13 @@ public class ProductService {
     @Transactional
     public ProductResponse adjustStock(Long prdId, Integer quantity) {
         if (quantity == null || quantity == 0) {
-            throw new IllegalArgumentException("조정 수량을 입력해주세요. 예) 10 (추가) / -5 (차감)");
+            throw new ProductException(ProductErrorCode.INVALID_STOCK_QUANTITY);
         }
         // 판매가 시작된 상품은 재고 추가만 가능
         if (quantity < 0) {
             Product product = findProduct(prdId);
             if (!LocalDateTime.now().isBefore(product.getSaleStart())) {
-                throw new IllegalArgumentException("판매가 시작된 상품은 재고를 추가만 할 수 있습니다.");
+                throw new ProductException(ProductErrorCode.STOCK_DECREASE_NOT_ALLOWED);
             }
         }
         int result;
@@ -85,8 +89,8 @@ public class ProductService {
             result = productRepo.decreaseStock(prdId, -quantity); // 재고가 충분할 때만 차감
         }
         if (result == 0) {
-            findProduct(prdId); // 없는 상품이면 여기서 "존재하지 않는 상품" 예외
-            throw new IllegalArgumentException("현재 재고보다 많이 차감할 수 없습니다.");
+            findProduct(prdId); // 없는 상품이면 여기서 PRODUCT_NOT_FOUND 예외
+            throw new ProductException(ProductErrorCode.STOCK_SHORTAGE);
         }
         return ProductResponse.toDto(findProduct(prdId)); // UPDATE 후 영속성 컨텍스트가 비워져서 DB에서 다시 조회됨
     }
@@ -99,23 +103,20 @@ public class ProductService {
             productRepo.delete(product);
             productRepo.flush(); // 여기서 바로 DELETE 실행해야 FK 에러를 잡을 수 있음
         } catch (DataIntegrityViolationException e) {
-            throw new IllegalArgumentException("주문 내역이 있는 상품은 삭제할 수 없습니다.");
+            throw new ProductException(ProductErrorCode.PRODUCT_HAS_ORDERS);
         }
     }
 
     //내부 메소드
 
     private PopupStore findPopup(Long popId) {
-        if (popId == null) {
-            throw new IllegalArgumentException("popId는 필수입니다.");
-        }
         return popupRepo.findById(popId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팝업입니다. popId=" + popId));
+                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
     }
 
     private Product findProduct(Long prdId) {
         return productRepo.findById(prdId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품입니다. prdId=" + prdId));
+                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
     }
 
     private List<ProductResponse> toDtoList(List<Product> entityList) {
@@ -129,22 +130,22 @@ public class ProductService {
     // 필수값, 가격, 구매 제한, 판매기간 (팝업 종료일 다음날부터, 시작 < 종료)
     private void checkProduct(PopupStore popup, ProductRequest request) {
         if (request.getProductName() == null || request.getProductName().isBlank()) {
-            throw new IllegalArgumentException("상품명은 필수입니다.");
+            throw new ProductException(ProductErrorCode.PRODUCT_NAME_REQUIRED);
         }
         if (request.getPrice() == null || request.getPrice() < 0) {
-            throw new IllegalArgumentException("가격은 0원 이상 입력해주세요.");
+            throw new ProductException(ProductErrorCode.INVALID_PRICE);
         }
         if (request.getMaxQty() != null && request.getMaxQty() <= 0) {
-            throw new IllegalArgumentException("1인 구매 제한은 1개 이상이어야 합니다.");
+            throw new ProductException(ProductErrorCode.INVALID_MAX_QTY);
         }
         if (request.getSaleStart() == null || request.getSaleEnd() == null) {
-            throw new IllegalArgumentException("판매 시작일시와 종료일시는 필수입니다.");
+            throw new ProductException(ProductErrorCode.SALE_PERIOD_REQUIRED);
         }
         if (!request.getSaleStart().toLocalDate().isAfter(popup.getEndDate())) {
-            throw new IllegalArgumentException("판매 시작은 팝업 종료일(" + popup.getEndDate() + ") 다음날부터 가능합니다.");
+            throw new ProductException(ProductErrorCode.INVALID_SALE_START);
         }
         if (!request.getSaleEnd().isAfter(request.getSaleStart())) {
-            throw new IllegalArgumentException("판매 종료는 판매 시작보다 늦어야 합니다.");
+            throw new ProductException(ProductErrorCode.INVALID_SALE_PERIOD);
         }
     }
 
@@ -155,10 +156,10 @@ public class ProductService {
             return; // 판매 시작 전에는 자유롭게 수정
         }
         if (!request.getSaleStart().isEqual(product.getSaleStart())) {
-            throw new IllegalArgumentException("판매가 시작된 상품은 판매 시작일시를 변경할 수 없습니다.");
+            throw new ProductException(ProductErrorCode.SALE_START_LOCKED);
         }
         if (!request.getSaleEnd().isEqual(product.getSaleEnd()) && !request.getSaleEnd().isAfter(now)) {
-            throw new IllegalArgumentException("판매 종료일시는 현재 시각 이후로만 변경할 수 있습니다.");
+            throw new ProductException(ProductErrorCode.INVALID_SALE_END);
         }
     }
 }
