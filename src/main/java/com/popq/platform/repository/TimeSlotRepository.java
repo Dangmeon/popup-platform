@@ -18,12 +18,14 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
     // 팝업의 특정 날짜 회차 (시작시간 순)
     List<TimeSlot> findByPopupStore_PopIdAndSlotDateOrderByStartTimeAsc(Long popId, LocalDate slotDate);
 
-    // 같은 팝업 + 같은 날짜 + 같은 시작시간 회차가 이미 있는지 (등록할 때)
-    boolean existsByPopupStore_PopIdAndSlotDateAndStartTime(Long popId, LocalDate slotDate, String startTime);
+    // 같은 팝업 + 같은 날짜에 시간이 겹치는 회차가 있는지 (등록할 때)
+    // 겹침 조건 : 기존 시작 < 새 끝 그리고 기존 끝 > 새 시작 (HH:mm 문자열이라 크기 비교 가능)
+    boolean existsByPopupStore_PopIdAndSlotDateAndStartTimeLessThanAndEndTimeGreaterThan(
+            Long popId, LocalDate slotDate, String endTime, String startTime);
 
     // 위와 같지만 자기 자신은 빼고 확인 (수정할 때)
-    boolean existsByPopupStore_PopIdAndSlotDateAndStartTimeAndTimeSlotIdNot(
-            Long popId, LocalDate slotDate, String startTime, Long timeSlotId);
+    boolean existsByPopupStore_PopIdAndSlotDateAndStartTimeLessThanAndEndTimeGreaterThanAndTimeSlotIdNot(
+            Long popId, LocalDate slotDate, String endTime, String startTime, Long timeSlotId);
 
     // 팝업에 회차가 하나라도 있는지 (팝업 삭제 전 확인용)
     boolean existsByPopupStore_PopId(Long popId);
