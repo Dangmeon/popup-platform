@@ -50,7 +50,7 @@ public class ReservationService {
 
     // 예약 생성
     @Transactional
-    public ReservationResponse createReservation(Long memberId, ReservationCreateRequest request) {
+    public ReservationResponse createReservation(String username, ReservationCreateRequest request) {
 
         // 1. 예약 인원 유효성 확인 (peopleCount >= 1)
         // 6. 한 예약당 최대 인원 확인
@@ -61,7 +61,7 @@ public class ReservationService {
 
         // 2. 로그인 사용자 조회
         // TODO: 회원 예외 처리 구조 통일 후 커스텀 예외로 변경
-        User user = userRepository.findById(memberId)
+        User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
 
         // 3. TimeSlot 조회 + 동시성 제어
@@ -88,10 +88,10 @@ public class ReservationService {
         }
 
         // 5. 같은 회원 + 같은 슬롯 활성 예약 중복 확인
-        //    - HOLD / CONFIRMED / USED → 재예약 X
-        //    - CANCELLED / EXPIRED → 재예약 O
+        //    - HOLD / CONFIRMED / USED -> 재예약 X
+        //    - CANCELLED / EXPIRED -> 재예약 O
         boolean exist = reservationRepository.existsActiveReservation(
-                memberId,
+                user.getId(),
                 timeSlot.getTimeSlotId(),
                 ACTIVE_STATUSES
         );
@@ -129,15 +129,18 @@ public class ReservationService {
 
     // 예약 상세 조회
     @Transactional(readOnly = true)
-    public ReservationDetailResponse getReservation(Long memberId, Long reservationId){
+    public ReservationDetailResponse getReservation(String username, Long reservationId){
         // 1. reservationId로 예약 조회
         // 2. 예약 존재 여부 확인
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
         // 3. 본인 예약인지 확인
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
+
         // TODO: 회원 예외 처리 구조 통일 후 커스텀 예외로 변경
-        if(!reservation.getUser().getId().equals(memberId)){
+        if(!reservation.getUser().getId().equals(user.getId())){
             throw new IllegalArgumentException("회원이 아닙니다.");
         }
 
@@ -148,14 +151,17 @@ public class ReservationService {
 
     // 예약 확정
     @Transactional
-    public ReservationResponse confirmReservation(Long memberId, Long reservationId){
+    public ReservationResponse confirmReservation(String username, Long reservationId){
         // 1. reservationId로 예약 조회
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
         // 2. 본인 예약 여부 확인
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
+
         // TODO: 회원 예외 처리 구조 통일 후 커스텀 예외로 변경
-        if(!reservation.getUser().getId().equals(memberId)){
+        if(!reservation.getUser().getId().equals(user.getId())){
             throw new IllegalArgumentException("회원이 아닙니다.");
         }
 
@@ -195,14 +201,17 @@ public class ReservationService {
 
     // 예약 변경
     @Transactional
-    public ReservationResponse updateReservation(Long memberId, Long reservationId, ReservationUpdateRequest request){
+    public ReservationResponse updateReservation(String username, Long reservationId, ReservationUpdateRequest request){
         // 1. 예약 존재 확인
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
         // 2. 본인 예약인지 확인
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
+
         // TODO: 회원 예외 처리 구조 통일 후 커스텀 예외로 변경
-        if(!reservation.getUser().getId().equals(memberId)){
+        if(!reservation.getUser().getId().equals(user.getId())){
             throw new IllegalArgumentException("회원이 아닙니다.");
         }
 
@@ -321,12 +330,15 @@ public class ReservationService {
 
     // 예약 취소
     @Transactional
-    public ReservationResponse cancelReservation(Long memberId, Long reservationId){
+    public ReservationResponse cancelReservation(String username, Long reservationId){
         // 1. reservationId로 예약 조회
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
         // 2. 본인 예약인지 확인
-        if(!reservation.getUser().getId().equals(memberId)){
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
+
+        if(!reservation.getUser().getId().equals(user.getId())){
             throw new IllegalArgumentException("회원이 아닙니다.");
         }
         // 3. 현재 상태 확인
@@ -366,12 +378,15 @@ public class ReservationService {
 
     // QR 조회
     @Transactional(readOnly = true)
-    public byte[] getQr(Long memberId, Long reservationId){
+    public byte[] getQr(String username, Long reservationId){
         // 1. reservationId로 예약 조회
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
         // 2. 본인 예약인지 확인
-        if(!reservation.getUser().getId().equals(memberId)){
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
+
+        if(!reservation.getUser().getId().equals(user.getId())){
             throw new IllegalArgumentException("회원이 아닙니다.");
         }
         // 3. 예약 상태가 CONFIRMED인지 확인
