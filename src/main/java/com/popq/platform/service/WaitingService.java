@@ -105,8 +105,10 @@ public class WaitingService {
         WaitingQueue queue = waitingQueueRepository.findById(waitingId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId)); // 없으면 예외 던지기
 
-        // 내 앞 대기 팀 수 계산 (기본 0팀, 앞 팀이 현재 WAITING 상태인 경우에만 계산)
-        long teamsAhead = 0;
+        Long teamsAhead = null;
+        Integer minutesPerTeam = null;
+
+        // 내 앞 대기 팀 수 계산 (기본 null값, 앞 팀이 현재 WAITING 상태인 경우에만 계산)
         if (queue.getWaitingStatus() == WaitingStatus.WAITING) {
             LocalDateTime startOfDay = queue.getJoinedAt().toLocalDate().atStartOfDay();
             teamsAhead = waitingQueueRepository.countTeamsAhead(
@@ -115,10 +117,11 @@ public class WaitingService {
                     queue.getQueueNumber(),
                     startOfDay
             );
+            minutesPerTeam = 5; // waiting일 때만 예상 대기시간 5분 할당
         }
 
         // 현재 상태 DTO 반환
-        return WaitingStatusResponse.of(queue, teamsAhead, 5);
+        return WaitingStatusResponse.of(queue, teamsAhead, minutesPerTeam);
     }
 
     // 대기열 취소 메소드
@@ -132,16 +135,9 @@ public class WaitingService {
         // 검증 및 CANCELLED로 상태 변경
         waiting.cancel();
 
-        // 취소 상태 응답 DTO 생성 (취소되었으므로 앞 팀 수와 예상 대기 시간은 0으로 초기화)
-        WaitingStatusResponse response = WaitingStatusResponse.builder()
-                .waitingId(waiting.getWaitingId())
-                .popId(waiting.getPopupStore().getPopId())
-                .queueNumber(waiting.getQueueNumber())
-                .teamsAhead(0)
-                .estimatedWaitMins(0)
-                .status(waiting.getWaitingStatus())
-                .joinedAt(waiting.getJoinedAt())
-                .build();
+        // 취소 상태 응답 DTO 생성 (취소되었으므로 앞 팀 수와 예상 대기 시간은 null로)
+        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, null, null);
+
 
         // [웹소켓] 취소자 본인 + 관리자 페이지에 변경사항 반영
         sendWebSocketNotification(
@@ -150,8 +146,89 @@ public class WaitingService {
                 response,
                 "대기 취소"
         );
+        return response;
+    }
+
+    // [관리자용] 대기자 호출 (WAITING -> CALLED로 변경)
+    // @param waitingId 대기열 ID
+    // @param timeoutMinutes 입장 제한/유효 시간 (예: 10분)
+    @Transactional
+    public WaitingStatusResponse callWaiting(Long waitingId, int timeoutMinutes) {
+        // 대기열 내역 조회
+        WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+
+        // 엔티티 상태 전이 (규칙 검증(WAITING 인지?) 및 calledAt, expiresAt 시각 설정)
+        waiting.call(timeoutMinutes);
+
+        // 응답 DTO 생성 (호출 상태(앞에 아무도 없는 상태)는 앞 대기 팀 수와 대기 시간은 null 처리)
+        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, null, null);
+
+        // [웹소켓]
+        // - 고객: 입장 안내 팝업 유도
+        // - 관리자: 대기자 리스트 내 상태를 '호출 중'으로 실시간 변경
+        sendWebSocketNotification(
+                waiting.getWaitingId(),
+                waiting.getPopupStore().getPopId(),
+                response,
+                "대기자 호출"
+        );
 
         return response;
+    }
+
+     // [관리자용] 입장 완료 처리 (CALLED / WAITING -> ENTERED)
+     // @param waitingId 대기열 ID
+    @Transactional
+    public WaitingStatusResponse enterWaiting(Long waitingId) {
+        // 대기열 내역 조회
+        WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+
+        // 엔티티 상태 전이 (규칙 검증(WAITING or CALLED인지?) + enteredAt(추가 한다면) 기록)
+        waiting.enter();
+
+        // 응답 DTO 생성
+        WaitingStatusResponse response = WaitingStatusResponse.of(waiting, null, null);
+
+        // [웹소켓]
+        // - 고객 개인 채널: '입장 완료' 처리
+        // - 매장 관리자 채널: 활성 대기자 목록에서 퇴장 처리 (화면에서 제거)
+        sendWebSocketNotification(
+                waiting.getWaitingId(),
+                waiting.getPopupStore().getPopId(),
+                response,
+                "입장 완료"
+        );
+
+        return response;
+    }
+    // 자동 만료 처리 (CALLED -> EXPIRED) 입장 호출 먼저 구현 후(1차 프로토타입 이후) 이어서 제작 예정
+    @Transactional
+    public void expireWaitings(LocalDateTime now) {
+        // CALLED 상태이면서 입장 제한 시각(expiresAt)이 지난 건 조회
+        List<WaitingQueue> expiredList = waitingQueueRepository.findExpiredWaitings(WaitingStatus.CALLED, now);
+
+        if (expiredList.isEmpty()) {
+            return;
+        }
+
+        // 일괄 상태 전이 및 웹소켓 알림 발송
+        for (WaitingQueue waiting : expiredList) {
+            waiting.expire();
+
+            // 만료 상태이므로 teamsAhead, estimatedWaitMins는 null
+            WaitingStatusResponse response = WaitingStatusResponse.of(waiting, null, null);
+
+            sendWebSocketNotification(
+                    waiting.getWaitingId(),
+                    waiting.getPopupStore().getPopId(),
+                    response,
+                    "대기 시간 초과 만료"
+            );
+        }
+
+        log.info("[스케줄러] 총 {}건의 대기가 입장 시간 초과로 EXPIRED 처리되었습니다.", expiredList.size());
     }
 
     // 웹소켓 전달 메소드

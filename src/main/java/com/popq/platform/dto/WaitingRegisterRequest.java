@@ -17,6 +17,8 @@ public class WaitingRegisterRequest {
     @NotNull(message = "팝업스토어 ID는 필수입니다.") // 팝업 스토어 아이디는 NOT NULL이므로
     private Long popId;
 
+    private Long memberId;
+
     @NotBlank(message = "연락처는 필수입니다.") // 연락처는 NOT NULL이므로
     @Pattern(
             regexp = "^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$", // 01N(지역번호) - 000 or 0000[집 / 휴대폰] - 0000 패턴
