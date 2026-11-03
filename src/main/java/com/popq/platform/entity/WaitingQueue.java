@@ -1,5 +1,7 @@
 package com.popq.platform.entity;
 
+import com.popq.platform.exception.WaitingErrorCode;
+import com.popq.platform.exception.WaitingException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -65,8 +67,8 @@ public class WaitingQueue {
 
     public void call(int timeoutMinutes) {
         if (this.waitingStatus != WaitingStatus.WAITING) { // WAITING 상태가 아니라면 예외 던지기
-            throw new IllegalStateException("대기 상태인 대기열만 호출할 수 있습니다. 현재 상태: " + this.waitingStatus);
-        } //
+            throw new WaitingException(WaitingErrorCode.INVALID_STATUS_FOR_CALL); // 400 대기 중 상태일 때만 호출할 수 있습니다.
+        }
 
         LocalDateTime now = LocalDateTime.now(); // 현재 시간 객체 생성
         this.waitingStatus = WaitingStatus.CALLED; // called로 변경
