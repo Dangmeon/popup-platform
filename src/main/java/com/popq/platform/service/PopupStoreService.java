@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -65,6 +66,7 @@ public class PopupStoreService {
         checkPeriod(request);
         checkReservTime(request);
         checkWalkinStatus(request.getWalkinStatus());
+        checkPeriodChange(popup, request); // 기간이 바뀌면 회차, 상품과 충돌하는지 확인
         popup.update(request);
     }
 
@@ -131,6 +133,30 @@ public class PopupStoreService {
         if (request.getStartDate() != null && request.getEndDate() != null
                 && request.getStartDate().isAfter(request.getEndDate())) {
             throw new PopupException(PopupErrorCode.INVALID_POPUP_PERIOD);
+        }
+    }
+
+    // 운영기간 변경 체크 : 시작일이나 종료일이 바뀐 경우에만 확인
+    // 1. 새 기간 밖에 회차가 남으면 안 됨
+    // 2. 상품 판매는 팝업 종료일 다음날부터라서, 새 종료일 당일이나 그 전에 판매 시작하는 상품이 있으면 안 됨
+    private void checkPeriodChange(PopupStore popup, PopupStoreRequest request) {
+        boolean startChanged = !request.getStartDate().equals(popup.getStartDate());
+        boolean endChanged = !request.getEndDate().equals(popup.getEndDate());
+        if (!startChanged && !endChanged) {
+            return;
+        }
+
+        Long popId = popup.getPopId();
+        if (timeSlotRepo.existsByPopupStore_PopIdAndSlotDateBefore(popId, request.getStartDate())
+                || timeSlotRepo.existsByPopupStore_PopIdAndSlotDateAfter(popId, request.getEndDate())) {
+            throw new PopupException(PopupErrorCode.POPUP_TIMESLOT_OUT_OF_PERIOD);
+        }
+
+        if (endChanged) {
+            LocalDateTime nextDay = request.getEndDate().plusDays(1).atStartOfDay(); // 새 종료일 다음날 00:00
+            if (productRepo.existsByPopupStore_PopIdAndSaleStartBefore(popId, nextDay)) {
+                throw new PopupException(PopupErrorCode.POPUP_PRODUCT_SALE_CONFLICT);
+            }
         }
     }
 
