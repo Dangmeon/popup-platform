@@ -5,6 +5,8 @@ import com.popq.platform.dto.WaitingStatusResponse;
 import com.popq.platform.entity.PopupStore;
 import com.popq.platform.entity.WaitingQueue;
 import com.popq.platform.entity.WaitingStatus;
+import com.popq.platform.exception.WaitingErrorCode;
+import com.popq.platform.exception.WaitingException;
 import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.repository.WaitingQueueRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +37,7 @@ public class WaitingService {
 
         // 팝업스토어 존재 여부 확인
         PopupStore popup = popupStoreRepository.findByIdWithPessimisticLock(request.getPopId()) // + 비관적 락 팝업 레포에서 정의 필요
-                .orElseThrow(() -> new IllegalArgumentException("해당 팝업스토어가 존재하지 않습니다. ID: " + request.getPopId()));
+                .orElseThrow(() -> new WaitingException(WaitingErrorCode.POPUP_NOT_FOUND)); // 404 POPUP_NOT_FOUND
 
         // 다만 위 코드의 경우 비관적 락을 지금 팝업에 거는 행위임. 지금은 이거 외엔 순서 락을 걸 다른 기준이 없어 어쩔 수 없이 사용
         // 다음과 같은 문제점이 발생할 수 있음
@@ -45,7 +47,7 @@ public class WaitingService {
 
         // 팝업 운영 상태 검증 (walkin_status == 'OPEN'인지?)
         if (!"OPEN".equalsIgnoreCase(popup.getWalkinStatus())) {
-            throw new IllegalStateException("현재 해당 팝업스토어는 현장 대기 접수가 마감되었거나 중단되었습니다.");
+            throw new WaitingException(WaitingErrorCode.WAITING_CLOSED); // 409 현장 대기 접수가 마감되었습니다.
         }
 
         // 중복 접수 방지 (동일 팝업에 이미 등록되어 WAITING 혹은 CALLED 상태인 전화번호인지?)
@@ -57,7 +59,7 @@ public class WaitingService {
         ); // return true or false 셋다 true면 true 반환
 
         if (isAlreadyWaiting) {
-            throw new IllegalStateException("이미 대기 접수되었거나 호출 중인 번호입니다.");
+            throw new WaitingException(WaitingErrorCode.DUPLICATE_WAITING); // 409 이미 해당 팝업스토어에 대기 등록된 연락처입니다.
         } // 만약 이미 웨이팅중인 번호라면? 예외 던지기
 
         // 당일 대기번호 처리(당일 자정 00:00:00 이후 기준 MAX 번호 + 1)
@@ -103,7 +105,7 @@ public class WaitingService {
 
         // 대기열 내역 조회
         WaitingQueue queue = waitingQueueRepository.findById(waitingId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId)); // 없으면 예외 던지기
+                .orElseThrow(() -> new WaitingException(WaitingErrorCode.WAITING_NOT_FOUND)); // 404 해당 waitingId의 대기 내역을 찾을 수 없습니다.
 
         Long teamsAhead = null;
         Integer minutesPerTeam = null;
@@ -130,7 +132,7 @@ public class WaitingService {
 
         // 대기열 내역 조회
         WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+                .orElseThrow(() -> new WaitingException(WaitingErrorCode.WAITING_NOT_FOUND)); // 404 해당 waitingId의 대기 내역을 찾을 수 없습니다.
 
         // 검증 및 CANCELLED로 상태 변경
         waiting.cancel();
@@ -156,7 +158,7 @@ public class WaitingService {
     public WaitingStatusResponse callWaiting(Long waitingId, int timeoutMinutes) {
         // 대기열 내역 조회
         WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+                .orElseThrow(() -> new WaitingException(WaitingErrorCode.WAITING_NOT_FOUND)); // 404 해당 waitingId의 대기 내역을 찾을 수 없습니다.
 
         // 엔티티 상태 전이 (규칙 검증(WAITING 인지?) 및 calledAt, expiresAt 시각 설정)
         waiting.call(timeoutMinutes);
@@ -183,7 +185,7 @@ public class WaitingService {
     public WaitingStatusResponse enterWaiting(Long waitingId) {
         // 대기열 내역 조회
         WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+                .orElseThrow(() -> new WaitingException(WaitingErrorCode.WAITING_NOT_FOUND)); // 404 해당 waitingId의 대기 내역을 찾을 수 없습니다.
 
         // 엔티티 상태 전이 (규칙 검증(WAITING or CALLED인지?) + enteredAt(추가 한다면) 기록)
         waiting.enter();
