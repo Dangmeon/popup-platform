@@ -79,15 +79,17 @@ public class PopupStoreService {
     }
 
     // 팝업 삭제
+    @Transactional
     public void deletePopup(Long popId) {
-        // 회차가 등록된 팝업은 FK 때문에 삭제 불가 -> 500 대신 409 메시지로 안내
+        PopupStore popup = popupRepo.findById(popId).orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
+        // 회차가 등록된 팝업은 FK 때문에 삭제 불가 -> 500 대신 409 메시지로 안내 / 없는 팝업이면 404
         if (timeSlotRepo.existsByPopupStore_PopId(popId)) {
             throw new PopupException(PopupErrorCode.POPUP_HAS_TIMESLOTS);
         }
         if (productRepo.existsByPopupStore_PopId(popId)) {
             throw new PopupException(PopupErrorCode.POPUP_HAS_PRODUCTS);
         }
-        popupRepo.deleteById(popId);
+        popupRepo.delete(popup);
     }
 
     // 팝업 상세 조회
