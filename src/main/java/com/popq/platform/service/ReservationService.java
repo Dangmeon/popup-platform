@@ -36,6 +36,7 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final TimeSlotRepository timeSlotRepository;
     private final UserRepository userRepository;
+    private final ReservationExpirationService reservationExpirationService;
 
     private static final int MAX_PEOPLE_COUNT = 3;
     private static final int HOLD_EXPIRE_MINUTES = 10;
@@ -176,14 +177,11 @@ public class ReservationService {
         /**
          *  나중에 레디스 구현 시 별도 서비스에서 처리 후 호출하게
          * **/
-        TimeSlot timeSlot = timeSlotRepository.findByIdForUpdate(reservation.getTimeSlot().getTimeSlotId())
-                .orElseThrow(() -> new ReservationException(ReservationErrorCode.TIMESLOT_NOT_FOUND));
-
         LocalDateTime now = LocalDateTime.now();
 
         if(!now.isBefore(reservation.getExpiresAt())){
-            reservation.expire();
-            timeSlot.decreaseReservedCount(reservation.getPeopleCount());
+
+            reservationExpirationService.expireReservation(reservationId);
 
             return ReservationResponse.fromReservation(reservation);
         }
