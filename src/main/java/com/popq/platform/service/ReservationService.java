@@ -9,16 +9,14 @@ import com.popq.platform.dto.ReservationCreateRequest;
 import com.popq.platform.dto.ReservationDetailResponse;
 import com.popq.platform.dto.ReservationResponse;
 import com.popq.platform.dto.ReservationUpdateRequest;
-import com.popq.platform.entity.Reservation;
-import com.popq.platform.entity.ReservationStatus;
-import com.popq.platform.entity.TimeSlot;
-import com.popq.platform.entity.User;
+import com.popq.platform.entity.*;
 import com.popq.platform.exception.ReservationErrorCode;
 import com.popq.platform.exception.ReservationException;
 import com.popq.platform.repository.ReservationRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import com.popq.platform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +35,8 @@ public class ReservationService {
     private final TimeSlotRepository timeSlotRepository;
     private final UserRepository userRepository;
     private final ReservationExpirationService reservationExpirationService;
+    private final ReservationHoldRedisService reservationHoldRedisService;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final int MAX_PEOPLE_COUNT = 3;
     private static final int HOLD_EXPIRE_MINUTES = 10;
@@ -124,6 +124,13 @@ public class ReservationService {
         // 11. 예약 저장
         Reservation savedReservation = reservationRepository.save(reservation);
 
+        eventPublisher.publishEvent(
+                new ReservationHoldCreatedEvent(
+                        savedReservation.getReservationId(),
+                        HOLD_EXPIRE_MINUTES
+                )
+        );
+
         // 12. ReservationResponse 반환
         return ReservationResponse.fromReservation(savedReservation);
     }
@@ -192,6 +199,8 @@ public class ReservationService {
         String token = UUID.randomUUID().toString();
 
         reservation.confirm(token);
+
+        reservationHoldRedisService.deleteHold(reservationId);
 
         // 8. 결과 반환
         return ReservationResponse.fromReservation(reservation);

@@ -21,7 +21,7 @@ public class ReservationExpirationScheduler {
     // for문은 그 리스트 안의 만료 대상 예약들을 하나씩 꺼내 실제 만료 처리 서비스에 넘기기 위해 사용
     // 만료 여부 자체는 Repository 조회 조건에서 이미 필터링
 
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 600000)
     public void expireHoldReservations() {
 
         List<Reservation> expiredReservations = reservationRepository.findExpiredReservations(
