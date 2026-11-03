@@ -28,7 +28,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
         SELECT r
         FROM Reservation r
         WHERE r.reservationStatus = :status
-            AND r.expiresAt < :now
+            AND r.expiresAt <= :now
     """)
     List<Reservation> findExpiredReservations(
             @Param("status") ReservationStatus status,
