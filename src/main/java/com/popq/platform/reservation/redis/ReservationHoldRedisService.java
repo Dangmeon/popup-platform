@@ -1,4 +1,4 @@
-package com.popq.platform.service;
+package com.popq.platform.reservation.redis;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;

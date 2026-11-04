@@ -1,7 +1,6 @@
-package com.popq.platform.listener;
+package com.popq.platform.reservation.redis;
 
-import com.popq.platform.entity.ReservationHoldCreatedEvent;
-import com.popq.platform.service.ReservationHoldRedisService;
+import com.popq.platform.reservation.event.ReservationHoldCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

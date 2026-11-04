@@ -1,6 +1,6 @@
 package com.popq.platform.config;
 
-import com.popq.platform.listener.ReservationExpirationRedisListener;
+import com.popq.platform.reservation.redis.ReservationExpirationRedisListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;

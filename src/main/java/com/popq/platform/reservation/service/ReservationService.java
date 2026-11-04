@@ -1,20 +1,22 @@
-package com.popq.platform.service;
+package com.popq.platform.reservation.service;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
-import com.popq.platform.dto.ReservationCreateRequest;
-import com.popq.platform.dto.ReservationDetailResponse;
-import com.popq.platform.dto.ReservationResponse;
-import com.popq.platform.dto.ReservationUpdateRequest;
+import com.popq.platform.reservation.dto.ReservationCreateRequest;
+import com.popq.platform.reservation.dto.ReservationDetailResponse;
+import com.popq.platform.reservation.dto.ReservationResponse;
+import com.popq.platform.reservation.dto.ReservationUpdateRequest;
 import com.popq.platform.entity.*;
-import com.popq.platform.exception.ReservationErrorCode;
-import com.popq.platform.exception.ReservationException;
-import com.popq.platform.repository.ReservationRepository;
+import com.popq.platform.reservation.exception.ReservationErrorCode;
+import com.popq.platform.reservation.exception.ReservationException;
+import com.popq.platform.reservation.repository.ReservationRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import com.popq.platform.repository.UserRepository;
+import com.popq.platform.reservation.event.ReservationHoldCreatedEvent;
+import com.popq.platform.reservation.redis.ReservationHoldRedisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -161,7 +163,7 @@ public class ReservationService {
     @Transactional
     public ReservationResponse confirmReservation(String username, Long reservationId){
         // 1. reservationId로 예약 조회
-        Reservation reservation = reservationRepository.findById(reservationId)
+        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId)
                 .orElseThrow(() -> new ReservationException(ReservationErrorCode.RESERVATION_NOT_FOUND));
 
         // 2. 본인 예약 여부 확인

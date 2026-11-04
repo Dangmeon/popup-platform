@@ -1,5 +1,6 @@
 package com.popq.platform.exception;
 
+import com.popq.platform.reservation.exception.ReservationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

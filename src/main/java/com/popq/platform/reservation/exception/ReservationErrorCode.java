@@ -1,4 +1,4 @@
-package com.popq.platform.exception;
+package com.popq.platform.reservation.exception;
 
 import lombok.Getter;
 import org.springframework.http.HttpStatus;

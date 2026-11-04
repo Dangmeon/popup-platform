@@ -1,6 +1,6 @@
-package com.popq.platform.listener;
+package com.popq.platform.reservation.redis;
 
-import com.popq.platform.service.ReservationExpirationService;
+import com.popq.platform.reservation.service.ReservationExpirationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;

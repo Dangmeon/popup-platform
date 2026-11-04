@@ -6,7 +6,7 @@ import com.popq.platform.dto.TimeSlotResponse;
 import com.popq.platform.entity.PopupStore;
 import com.popq.platform.entity.TimeSlot;
 import com.popq.platform.repository.PopupStoreRepository;
-import com.popq.platform.repository.ReservationRepository;
+import com.popq.platform.reservation.repository.ReservationRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
