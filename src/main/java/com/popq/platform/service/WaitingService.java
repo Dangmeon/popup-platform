@@ -59,7 +59,7 @@ public class WaitingService {
         ); // return true or false 셋다 true면 true 반환
 
         if (isAlreadyWaiting) {
-            throw new WaitingException(WaitingErrorCode.DUPLICATE_WAITING); // 409 이미 해당 팝업스토어에 대기 등록된 연락처입니다.
+            throw new WaitingException(WaitingErrorCode.ALREADY_WAITING); // 409 이미 해당 팝업스토어에 대기 등록된 연락처입니다.
         } // 만약 이미 웨이팅중인 번호라면? 예외 던지기
 
         // 당일 대기번호 처리(당일 자정 00:00:00 이후 기준 MAX 번호 + 1)

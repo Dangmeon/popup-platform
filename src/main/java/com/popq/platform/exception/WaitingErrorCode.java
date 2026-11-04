@@ -28,7 +28,8 @@ public enum WaitingErrorCode {
     NOT_CALLED_YET(HttpStatus.BAD_REQUEST, "호출 상태인 대기 팀만 처리할 수 있습니다."),
 
     // 409 CONFLICT
-    DUPLICATE_WAITING(HttpStatus.CONFLICT, "이미 해당 팝업스토어에 대기 등록된 연락처입니다."),
+    ALREADY_WAITING(HttpStatus.CONFLICT, "이미 해당 팝업스토어에 대기 등록된 연락처입니다."),
+    POPUP_NOT_OPEN(HttpStatus.CONFLICT, "현재 대기 접수 시간이 아닙니다."),
     WAITING_CLOSED(HttpStatus.CONFLICT, "현장 대기 접수가 마감되었습니다.");
 
     private final HttpStatus httpStatus;
