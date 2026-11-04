@@ -181,6 +181,7 @@ public class TimeSlotService {
                 || request.getStartDate().isAfter(request.getEndDate())) {
             throw new TimeSlotException(TimeSlotErrorCode.GENERATE_PERIOD_OUT_OF_RANGE);
         }
+        checkReservTime(popup, request.getStartTime(), request.getEndTime()); // 생성 시간도 팝업 예약 시간 안
     }
 
     // 하루치 회차 목록 만들기 (저장은 generateTimeSlots에서)
@@ -273,6 +274,18 @@ public class TimeSlotService {
         }
         if (request.getSlotDate().isBefore(popup.getStartDate()) || request.getSlotDate().isAfter(popup.getEndDate())) {
             throw new TimeSlotException(TimeSlotErrorCode.SLOT_DATE_OUT_OF_PERIOD);
+        }
+        checkReservTime(popup, request.getStartTime(), request.getEndTime());
+    }
+
+    // 팝업 예약 시간 안인지 : 예약 시작보다 일찍 시작하거나 예약 종료보다 늦게 끝나면 안 됨
+    // 팝업에 예약 시간이 비어 있으면 제한 없음 / HH:mm 형식이라 문자열 비교로 판단
+    private void checkReservTime(PopupStore popup, String start, String end) {
+        if (popup.getReservStart() != null && start.compareTo(popup.getReservStart()) < 0) {
+            throw new TimeSlotException(TimeSlotErrorCode.SLOT_TIME_OUT_OF_RESERV_TIME);
+        }
+        if (popup.getReservEnd() != null && end.compareTo(popup.getReservEnd()) > 0) {
+            throw new TimeSlotException(TimeSlotErrorCode.SLOT_TIME_OUT_OF_RESERV_TIME);
         }
     }
 }

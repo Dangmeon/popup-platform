@@ -67,6 +67,7 @@ public class PopupStoreService {
         checkReservTime(request);
         checkWalkinStatus(request.getWalkinStatus());
         checkPeriodChange(popup, request); // 기간이 바뀌면 회차, 상품과 충돌하는지 확인
+        checkReservTimeChange(popup, request); // 예약 시간이 바뀌면 회차와 충돌하는지 확인
         popup.update(request);
     }
 
@@ -157,6 +158,23 @@ public class PopupStoreService {
             if (productRepo.existsByPopupStore_PopIdAndSaleStartBefore(popId, nextDay)) {
                 throw new PopupException(PopupErrorCode.POPUP_PRODUCT_SALE_CONFLICT);
             }
+        }
+    }
+
+    // 예약 시간 변경 체크 : 예약 시작·종료 시간이 바뀐 경우에만 확인
+    // 새 예약 시간보다 일찍 시작하거나 늦게 끝나는 회차가 남으면 안 됨 (비우면 제한 없음)
+    private void checkReservTimeChange(PopupStore popup, PopupStoreRequest request) {
+        Long popId = popup.getPopId();
+        String newStart = request.getReservStart();
+        String newEnd = request.getReservEnd();
+
+        if (newStart != null && !newStart.equals(popup.getReservStart())
+                && timeSlotRepo.existsByPopupStore_PopIdAndStartTimeLessThan(popId, newStart)) {
+            throw new PopupException(PopupErrorCode.POPUP_TIMESLOT_OUT_OF_RESERV_TIME);
+        }
+        if (newEnd != null && !newEnd.equals(popup.getReservEnd())
+                && timeSlotRepo.existsByPopupStore_PopIdAndEndTimeGreaterThan(popId, newEnd)) {
+            throw new PopupException(PopupErrorCode.POPUP_TIMESLOT_OUT_OF_RESERV_TIME);
         }
     }
 

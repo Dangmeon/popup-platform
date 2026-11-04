@@ -15,7 +15,8 @@ public enum PopupErrorCode {
     INVALID_RESERV_TIME_FORMAT(HttpStatus.BAD_REQUEST, "예약 시작·종료 시간은 HH:mm 형식이어야 합니다. 예) 10:00"),
     INVALID_RESERV_TIME_RANGE(HttpStatus.BAD_REQUEST, "예약 종료 시간은 시작 시간보다 늦어야 합니다."),
     POPUP_TIMESLOT_OUT_OF_PERIOD(HttpStatus.CONFLICT, "변경할 운영기간 밖에 회차가 있습니다. 해당 회차를 먼저 삭제하거나 수정해주세요."),
-    POPUP_PRODUCT_SALE_CONFLICT(HttpStatus.CONFLICT, "팝업 종료일은 등록된 상품의 판매 시작일보다 앞이어야 합니다. 상품 판매기간을 먼저 수정해주세요.");
+    POPUP_PRODUCT_SALE_CONFLICT(HttpStatus.CONFLICT, "팝업 종료일은 등록된 상품의 판매 시작일보다 앞이어야 합니다. 상품 판매기간을 먼저 수정해주세요."),
+    POPUP_TIMESLOT_OUT_OF_RESERV_TIME(HttpStatus.CONFLICT, "변경할 예약 시간 밖에 회차가 있습니다. 해당 회차를 먼저 삭제하거나 수정해주세요.");
 
     private final HttpStatus status;
     private final String message;
