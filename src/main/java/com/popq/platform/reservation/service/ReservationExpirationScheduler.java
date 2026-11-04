@@ -4,6 +4,8 @@ import com.popq.platform.entity.Reservation;
 import com.popq.platform.entity.ReservationStatus;
 import com.popq.platform.reservation.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +17,7 @@ import java.util.List;
 public class ReservationExpirationScheduler {
 
     private static final long FALLBACK_INTERVAL = 20 * 60 * 1000L;
+    private static final Logger log = LoggerFactory.getLogger(ReservationExpirationScheduler.class);
 
     private final ReservationRepository reservationRepository;
     private final ReservationExpirationService reservationExpirationService;
@@ -32,7 +35,17 @@ public class ReservationExpirationScheduler {
         );
 
         for (Reservation reservation : expiredReservations) {
-            reservationExpirationService.expireReservation(reservation.getReservationId());
+            try {
+                reservationExpirationService.expireReservation(
+                        reservation.getReservationId()
+                );
+            } catch (Exception e) {
+                log.error(
+                        "예약 만료 처리 실패. reservationId={}",
+                        reservation.getReservationId(),
+                        e
+                );
+            }
         }
     }
 }
