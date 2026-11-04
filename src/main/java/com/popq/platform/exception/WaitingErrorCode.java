@@ -22,6 +22,7 @@ public enum WaitingErrorCode {
     INVALID_PHONE_NUMBER(HttpStatus.BAD_REQUEST, "잘못된 전화번호 형식입니다."),
     INVALID_PEOPLE_COUNT(HttpStatus.BAD_REQUEST, "인원수는 최소 1명 이상이어야 합니다."),
     ALREADY_CANCELED(HttpStatus.BAD_REQUEST, "이미 취소된 대기입니다."),
+    ALREADY_CALLED(HttpStatus.BAD_REQUEST, "이미 호출된 대기입니다."),
     ALREADY_ENTERED(HttpStatus.BAD_REQUEST, "이미 입장된 대기 입니다."),
     ALREADY_EXPIRED(HttpStatus.BAD_REQUEST, "이미 만료처리된 대기 입니다."),
     INVALID_STATUS_FOR_CALL(HttpStatus.BAD_REQUEST, "대기 중 상태일 때만 호출할 수 있습니다."),

@@ -66,6 +66,9 @@ public class WaitingQueue {
     } // 등록 될 때
 
     public void call(int timeoutMinutes) {
+        if (this.waitingStatus == WaitingStatus.CALLED) { // CALLED 상태인데 또 호출한다면 예외던지기
+            throw new WaitingException(WaitingErrorCode.ALREADY_CALLED); // 400 이미 호출된 대기입니다.
+        }
         if (this.waitingStatus != WaitingStatus.WAITING) { // WAITING 상태가 아니라면 예외 던지기
             throw new WaitingException(WaitingErrorCode.INVALID_STATUS_FOR_CALL); // 400 대기 중 상태일 때만 호출할 수 있습니다.
         }
