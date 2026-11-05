@@ -34,7 +34,7 @@ public class ProductService {
     // 팝업의 상품 목록
     public List<ProductResponse> listProduct(Long popId) {
         findPopup(popId); // 없는 팝업이면 404
-        return toDtoList(productRepo.findByPopupStore_PopIdOrderByPrdIdAsc(popId));
+        return toDtoList(productRepo.findByPopId(popId));
     }
 
     // 상품 상세 조회

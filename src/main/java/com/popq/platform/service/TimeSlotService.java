@@ -44,9 +44,9 @@ public class TimeSlotService {
         findPopup(popId); // 없는 팝업이면 404
         List<TimeSlot> entityList;
         if (date != null) {
-            entityList = timeSlotRepo.findByPopupStore_PopIdAndSlotDateOrderByStartTimeAsc(popId, date);
+            entityList = timeSlotRepo.findByPopIdAndDate(popId, date);
         } else {
-            entityList = timeSlotRepo.findByPopupStore_PopIdOrderBySlotDateAscStartTimeAsc(popId);
+            entityList = timeSlotRepo.findByPopId(popId);
         }
         return toDtoList(entityList);
     }
@@ -60,8 +60,8 @@ public class TimeSlotService {
     public TimeSlotResponse insertTimeSlot(Long popId, TimeSlotRequest request) { // popId는 URL에서 받음
         PopupStore popup = findPopup(popId);
         checkTimeSlot(popup, request);
-        if (timeSlotRepo.existsByPopupStore_PopIdAndSlotDateAndStartTimeLessThanAndEndTimeGreaterThan(
-                popup.getPopId(), request.getSlotDate(), request.getEndTime(), request.getStartTime())) {
+        if (timeSlotRepo.existsOverlap(
+                popup.getPopId(), request.getSlotDate(), request.getStartTime(), request.getEndTime())) {
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_OVERLAP);
         }
         TimeSlot saved = timeSlotRepo.save(TimeSlot.toEntity(null, popup, request, 0));
@@ -102,8 +102,8 @@ public class TimeSlotService {
         if (request.getCapacity() < slot.getReservedCount()) {
             throw new TimeSlotException(TimeSlotErrorCode.CAPACITY_BELOW_RESERVED);
         }
-        if (timeSlotRepo.existsByPopupStore_PopIdAndSlotDateAndStartTimeLessThanAndEndTimeGreaterThanAndTimeSlotIdNot(
-                popup.getPopId(), request.getSlotDate(), request.getEndTime(), request.getStartTime(), timeSlotId)) {
+        if (timeSlotRepo.existsOverlapExceptSelf(
+                popup.getPopId(), request.getSlotDate(), request.getStartTime(), request.getEndTime(), timeSlotId)) {
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_OVERLAP);
         }
         slot.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE (예약 인원은 그대로)
@@ -194,7 +194,7 @@ public class TimeSlotService {
         LocalTime lunchEnd = request.getLunchEnd() != null ? LocalTime.parse(request.getLunchEnd()) : null;
 
         // 그날 이미 있는 회차 (시간 겹침 확인 + 회차 번호 계산, DB 조회는 하루 1번)
-        List<TimeSlot> existingSlots = timeSlotRepo.findByPopupStore_PopIdAndSlotDateOrderByStartTimeAsc(popup.getPopId(), date);
+        List<TimeSlot> existingSlots = timeSlotRepo.findByPopIdAndDate(popup.getPopId(), date);
         int maxSlotNum = 0;
         for (TimeSlot s : existingSlots) {
             if (s.getSlotNum() != null && s.getSlotNum() > maxSlotNum) {

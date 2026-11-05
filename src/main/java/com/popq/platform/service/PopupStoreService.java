@@ -44,7 +44,7 @@ public class PopupStoreService {
 
     // 카테고리별 팝업 조회
     public List<PopupStoreResponse> listPopupByCategory(String category) {
-        return toDtoList(popupRepo.findByCategoryOrderByStartDateDesc(category));
+        return toDtoList(popupRepo.findByCategory(category));
     }
 
     // 팝업 등록 : 등록된 팝업 정보 반환
@@ -90,10 +90,10 @@ public class PopupStoreService {
     public void deletePopup(Long popId) {
         PopupStore popup = popupRepo.findById(popId).orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
         // 회차가 등록된 팝업은 FK 때문에 삭제 불가 -> 500 대신 409 메시지로 안내 / 없는 팝업이면 404
-        if (timeSlotRepo.existsByPopupStore_PopId(popId)) {
+        if (timeSlotRepo.existsByPopId(popId)) {
             throw new PopupException(PopupErrorCode.POPUP_HAS_TIMESLOTS);
         }
-        if (productRepo.existsByPopupStore_PopId(popId)) {
+        if (productRepo.existsByPopId(popId)) {
             throw new PopupException(PopupErrorCode.POPUP_HAS_PRODUCTS);
         }
         popupRepo.delete(popup);
@@ -162,14 +162,14 @@ public class PopupStoreService {
         }
 
         Long popId = popup.getPopId();
-        if (timeSlotRepo.existsByPopupStore_PopIdAndSlotDateBefore(popId, request.getStartDate())
-                || timeSlotRepo.existsByPopupStore_PopIdAndSlotDateAfter(popId, request.getEndDate())) {
+        if (timeSlotRepo.existsBeforeStartDate(popId, request.getStartDate())
+                || timeSlotRepo.existsAfterEndDate(popId, request.getEndDate())) {
             throw new PopupException(PopupErrorCode.POPUP_TIMESLOT_OUT_OF_PERIOD);
         }
 
         if (endChanged) {
             LocalDateTime nextDay = request.getEndDate().plusDays(1).atStartOfDay(); // 새 종료일 다음날 00:00
-            if (productRepo.existsByPopupStore_PopIdAndSaleStartBefore(popId, nextDay)) {
+            if (productRepo.existsSaleStartBefore(popId, nextDay)) {
                 throw new PopupException(PopupErrorCode.POPUP_PRODUCT_SALE_CONFLICT);
             }
         }
@@ -183,11 +183,11 @@ public class PopupStoreService {
         String newEnd = request.getReservEnd();
 
         if (newStart != null && !newStart.equals(popup.getReservStart())
-                && timeSlotRepo.existsByPopupStore_PopIdAndStartTimeLessThan(popId, newStart)) {
+                && timeSlotRepo.existsBeforeReservStart(popId, newStart)) {
             throw new PopupException(PopupErrorCode.POPUP_TIMESLOT_OUT_OF_RESERV_TIME);
         }
         if (newEnd != null && !newEnd.equals(popup.getReservEnd())
-                && timeSlotRepo.existsByPopupStore_PopIdAndEndTimeGreaterThan(popId, newEnd)) {
+                && timeSlotRepo.existsAfterReservEnd(popId, newEnd)) {
             throw new PopupException(PopupErrorCode.POPUP_TIMESLOT_OUT_OF_RESERV_TIME);
         }
     }
