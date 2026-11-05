@@ -1,4 +1,3 @@
-
 package com.popq.platform.repository;
 
 import com.popq.platform.entity.Cart;
@@ -9,9 +8,15 @@ import java.util.Optional;
 
 public interface CartRepository extends JpaRepository<Cart, Long> {
 
-    // 특정 회원의 장바구니 전체 조회
+    // 회원 장바구니 조회
     List<Cart> findByMemberId(Long memberId);
 
-    // 회원이 이미 담은 상품인지 확인
-    Optional<Cart> findByMemberIdAndPrdId(Long memberId, Long prdId);
+    // 최근 등록 순서 조회
+    List<Cart> findByMemberIdOrderByAddedAtDescCartIdDesc(Long memberId);
+
+    // 기존에 담은 상품 조회
+    Optional<Cart> findByMemberIdAndPrdId(
+            Long memberId,
+            Long prdId
+    );
 }

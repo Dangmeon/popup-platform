@@ -1,4 +1,3 @@
-
 package com.popq.platform.entity;
 
 import jakarta.persistence.*;
@@ -15,21 +14,33 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class Cart {
 
+    // 장바구니 번호
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @SequenceGenerator(
+            name = "cart_seq_gen",
+            sequenceName = "CART_SEQ",
+            allocationSize = 1
+    )
+    @GeneratedValue(
+            strategy = GenerationType.SEQUENCE,
+            generator = "cart_seq_gen"
+    )
     @Column(name = "CART_ID")
     private Long cartId;
 
+    // 회원 및 상품
     @Column(name = "MEMBER_ID", nullable = false)
     private Long memberId;
 
     @Column(name = "PRD_ID", nullable = false)
     private Long prdId;
 
+    // 상품 수량
     @Column(name = "QUANTITY", nullable = false)
     private Integer quantity;
 
-    @Column(name = "ADDED_AT")
+    // 등록 시각
+    @Column(name = "ADDED_AT", nullable = false)
     private LocalDateTime addedAt;
 
     @PrePersist
