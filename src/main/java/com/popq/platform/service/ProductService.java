@@ -33,6 +33,7 @@ public class ProductService {
 
     // 팝업의 상품 목록
     public List<ProductResponse> listProduct(Long popId) {
+        findPopup(popId); // 없는 팝업이면 404
         return toDtoList(productRepo.findByPopupStore_PopIdOrderByPrdIdAsc(popId));
     }
 
@@ -59,14 +60,15 @@ public class ProductService {
         return ProductResponse.toDto(saved); // prdId 대신 상품 정보 전체 반환
     }
 
-    // 상품 수정 : 팝업은 바꿀 수 없고, 재고는 수정되지 않음 (재고 조정 API 사용)
+    // 상품 수정 : 팝업은 바꿀 수 없고, 재고는 수정되지 않음 (재고 조정 API 사용) / 수정된 상품 정보 반환
     @Transactional
-    public void updateProduct(Long prdId, ProductRequest request) {
+    public ProductResponse updateProduct(Long prdId, ProductRequest request) {
         Product product = findProduct(prdId);
         PopupStore popup = product.getPopupStore();
         checkProduct(popup, request);
         checkSalePeriodChange(product, request);
         product.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE
+        return ProductResponse.toDto(product);
     }
 
     // 재고 조정 : quantity 양수면 추가, 음수면 차감 / 조정 후 상품 정보 반환

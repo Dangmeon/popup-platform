@@ -41,6 +41,7 @@ public class TimeSlotService {
 
     // 회차 목록 (date가 있으면 그 날짜만)
     public List<TimeSlotResponse> listTimeSlot(Long popId, LocalDate date) {
+        findPopup(popId); // 없는 팝업이면 404
         List<TimeSlot> entityList;
         if (date != null) {
             entityList = timeSlotRepo.findByPopupStore_PopIdAndSlotDateOrderByStartTimeAsc(popId, date);
@@ -85,7 +86,7 @@ public class TimeSlotService {
 
     // 예약 이력이 있으면(취소, 만료 포함) 날짜/시간은 못 바꾸고 정원만 변경 가능
     @Transactional
-    public void updateTimeSlot(Long timeSlotId, TimeSlotRequest request) {
+    public TimeSlotResponse updateTimeSlot(Long timeSlotId, TimeSlotRequest request) {
         TimeSlot slot = findTimeSlotForUpdate(timeSlotId); // 락 : 수정 중에 예약 인원이 바뀌지 않도록
         PopupStore popup = slot.getPopupStore();
         checkTimeSlot(popup, request);
@@ -106,6 +107,7 @@ public class TimeSlotService {
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_OVERLAP);
         }
         slot.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE (예약 인원은 그대로)
+        return TimeSlotResponse.toDto(slot);
     }
 
     // 예약이 있거나 예약 이력이 있으면 삭제 불가
