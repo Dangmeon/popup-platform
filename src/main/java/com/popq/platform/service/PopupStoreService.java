@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@Transactional(readOnly = true)
 public class PopupStoreService {
 
     PopupStoreRepository popupRepo;
@@ -53,22 +54,25 @@ public class PopupStoreService {
         checkPeriod(request);
         checkReservTime(request);
         checkWalkinStatus(request.getWalkinStatus());
+        checkNumbers(request); // 예약 정원, 오픈 차수 확인
         PopupStore saved = popupRepo.save(PopupStore.toEntity(null, request)); // popId가 null이면 insert
         return PopupStoreResponse.toDto(saved);
     }
 
-    // 팝업 수정 : 조회한 팝업의 값을 바꾸면 트랜잭션 끝날 때 자동 UPDATE (save 호출 X)
+    // 팝업 수정 : 조회한 팝업의 값을 바꾸면 트랜잭션 끝날 때 자동 UPDATE (save 호출 X) / 수정된 팝업 정보 반환
     @Transactional
-    public void updatePopup(Long popId, PopupStoreRequest request) {
+    public PopupStoreResponse updatePopup(Long popId, PopupStoreRequest request) {
         PopupStore popup = popupRepo.findById(popId)
                 .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
         checkRequired(request);
         checkPeriod(request);
         checkReservTime(request);
         checkWalkinStatus(request.getWalkinStatus());
+        checkNumbers(request); // 예약 정원, 오픈 차수 확인
         checkPeriodChange(popup, request); // 기간이 바뀌면 회차, 상품과 충돌하는지 확인
         checkReservTimeChange(popup, request); // 예약 시간이 바뀌면 회차와 충돌하는지 확인
         popup.update(request);
+        return PopupStoreResponse.toDto(popup);
     }
 
     // 웨이팅 상태 변경 : 변경된 팝업 정보 반환
@@ -126,6 +130,16 @@ public class PopupStoreService {
         if (walkinStatus != null && !walkinStatus.equals("OPEN")
                 && !walkinStatus.equals("PAUSED") && !walkinStatus.equals("CLOSED")) {
             throw new PopupException(PopupErrorCode.INVALID_WALKIN_STATUS);
+        }
+    }
+
+    // 숫자 체크 : 예약 정원(reservPeopleCap), 오픈 차수(roundNum)는 값이 있으면 1 이상 (비우면 허용)
+    private void checkNumbers(PopupStoreRequest request) {
+        if (request.getReservPeopleCap() != null && request.getReservPeopleCap() < 1) {
+            throw new PopupException(PopupErrorCode.INVALID_RESERV_PEOPLE_CAP);
+        }
+        if (request.getRoundNum() != null && request.getRoundNum() < 1) {
+            throw new PopupException(PopupErrorCode.INVALID_ROUND_NUM);
         }
     }
 
