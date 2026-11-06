@@ -116,11 +116,12 @@ public class PopupStoreService {
         return dtoList;
     }
 
-    // 필수값 체크 : 회차 생성에서 운영기간을 사용하므로 시작일, 종료일은 반드시 필요
+    // 필수값 체크 : 회차 생성에서 운영기간과 예약 시간을 사용하므로 반드시 필요
     private void checkRequired(PopupStoreRequest request) {
         if (request.getTitle() == null || request.getTitle().isBlank()
                 || request.getLocation() == null || request.getLocation().isBlank()
-                || request.getStartDate() == null || request.getEndDate() == null) {
+                || request.getStartDate() == null || request.getEndDate() == null
+                || request.getReservStart() == null || request.getReservEnd() == null) {
             throw new PopupException(PopupErrorCode.POPUP_REQUIRED_FIELD);
         }
     }
