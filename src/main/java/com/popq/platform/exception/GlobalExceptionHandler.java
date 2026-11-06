@@ -51,4 +51,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
 
     }
+
+    @ExceptionHandler(WaitingException.class)
+    public ResponseEntity<ErrorResponse> handleWaitingException(WaitingException e) {
+        WaitingErrorCode errorCode = e.getErrorCode();
+
+        ErrorResponse response = new ErrorResponse(
+                errorCode.name(),          // 에러 코드 문자열 (예: "ALREADY_CALLED")
+                errorCode.getMessage(),   // 에러 메시지 (예: "이미 호출된 대기입니다.")
+                null                      // 유효성 검증 필드 에러가 아니므로 null
+        );
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(response);
+    }
 }
