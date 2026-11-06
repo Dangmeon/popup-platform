@@ -51,6 +51,6 @@ public class ProductResponse {
         if (entity.getSaleEnd() != null && !now.isBefore(entity.getSaleEnd())) {
             return "ENDED";
         }
-        return entity.getStock() > 0 ? "ON_SALE" : "SOLD_OUT";
+        return entity.getStock() != null && entity.getStock() > 0 ? "ON_SALE" : "SOLD_OUT";
     }
 }

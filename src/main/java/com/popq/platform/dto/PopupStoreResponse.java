@@ -50,6 +50,9 @@ public class PopupStoreResponse {
 
     // 오늘 날짜 기준 팝업 진행 상태 계산
     private static String getStatus(PopupStore entity) {
+        if (entity.getStartDate() == null || entity.getEndDate() == null) {
+            return null; // 운영기간이 비어 있으면 상태를 계산하지 않음
+        }
         LocalDate today = LocalDate.now();
         if (today.isBefore(entity.getStartDate())) {
             return "UPCOMING";
