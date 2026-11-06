@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
@@ -14,6 +15,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // 팝업에 상품이 하나라도 있는지 (팝업 삭제 전 확인용)
     boolean existsByPopupStore_PopId(Long popId);
+
+    // 팝업 종료일 수정 전 확인용 : 판매 시작이 기준 시각보다 빠른 상품이 있는지
+    // 기준 시각 = 새 종료일 다음날 00:00 -> 판매 시작일이 새 종료일 당일이거나 그 전이면 true
+    boolean existsByPopupStore_PopIdAndSaleStartBefore(Long popId, LocalDateTime dateTime);
 
     // [주문 연동] 주문 생성 시 재고 차감 - 재고가 충분할 때만 (조건부 UPDATE)
     // 결과 1 : 성공 / 0 : 품절 또는 재고 부족

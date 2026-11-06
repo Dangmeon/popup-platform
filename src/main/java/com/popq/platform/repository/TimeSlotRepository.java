@@ -30,6 +30,18 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
     // 팝업에 회차가 하나라도 있는지 (팝업 삭제 전 확인용)
     boolean existsByPopupStore_PopId(Long popId);
 
+    // 팝업 기간 수정 전 확인용 : 새 시작일보다 앞에 있는 회차가 있는지
+    boolean existsByPopupStore_PopIdAndSlotDateBefore(Long popId, LocalDate startDate);
+
+    // 팝업 기간 수정 전 확인용 : 새 종료일보다 뒤에 있는 회차가 있는지
+    boolean existsByPopupStore_PopIdAndSlotDateAfter(Long popId, LocalDate endDate);
+
+    // 팝업 예약 시간 수정 전 확인용 : 새 예약 시작 시간보다 일찍 시작하는 회차가 있는지 (HH:mm 문자열 비교)
+    boolean existsByPopupStore_PopIdAndStartTimeLessThan(Long popId, String reservStart);
+
+    // 팝업 예약 시간 수정 전 확인용 : 새 예약 종료 시간보다 늦게 끝나는 회차가 있는지
+    boolean existsByPopupStore_PopIdAndEndTimeGreaterThan(Long popId, String reservEnd);
+
     // [예약 연동] 비관적 락 조회
     // 같은 회차를 동시에 수정하려는 요청은 앞 트랜잭션이 끝날 때까지 대기
     @Lock(LockModeType.PESSIMISTIC_WRITE)
