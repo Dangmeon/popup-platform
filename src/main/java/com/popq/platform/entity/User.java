@@ -5,11 +5,13 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "member")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED) // 외부에서 기본 생성자 호출을 막고 빌더 사용 유도
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
     @Id
@@ -19,7 +21,7 @@ public class User {
     private Long id;
 
     @Column(name = "email", nullable = false, unique = true)
-    private String username;
+    private String username; // 이 필드가 로그인 ID(이메일) 역할
 
     @Column(name = "password", nullable = false)
     private String password;
@@ -34,12 +36,29 @@ public class User {
     @Column(name = "role", nullable = false)
     private Role role;
 
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
     @Builder
     public User(String username, String password, String name, String phone, Role role) {
         this.username = username;
         this.password = password;
         this.name = name;
         this.phone = phone;
-        this.role = (role != null) ? role : Role.USER; // 기본값 처리
+        this.role = (role != null) ? role : Role.USER;
+    }
+
+    public void updatePassword(String password) {
+        this.password = password;
+    }
+
+    public void updateMemberInfo(String name, String phone) {
+        if (name != null && !name.isBlank()) {
+            this.name = name;
+        }
+        if (phone != null && !phone.isBlank()) {
+            this.phone = phone;
+        }
     }
 }
