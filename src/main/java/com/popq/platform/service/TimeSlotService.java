@@ -27,6 +27,7 @@ import java.util.List;
 public class TimeSlotService {
 
     private static final String TIME_REGEX = "^([01]\\d|2[0-3]):[0-5]\\d$"; // HH:mm
+    private static final int MIN_INTERVAL_MINUTES = 30; // 자동 생성 회차 간격 최소값 (분)
 
     TimeSlotRepository timeSlotRepo;
     PopupStoreRepository popupRepo;
@@ -58,7 +59,7 @@ public class TimeSlotService {
     // 회차 1개 등록 : 등록된 회차 정보 반환
     @Transactional
     public TimeSlotResponse insertTimeSlot(Long popId, TimeSlotRequest request) { // popId는 URL에서 받음
-        PopupStore popup = findPopup(popId);
+        PopupStore popup = findPopupForUpdate(popId); // 동시에 등록해도 겹치는 회차가 생기지 않도록
         checkTimeSlot(popup, request);
         if (timeSlotRepo.existsOverlap(
                 popup.getPopId(), request.getSlotDate(), request.getStartTime(), request.getEndTime())) {
@@ -72,7 +73,7 @@ public class TimeSlotService {
     // 예) 10:00~16:00, 60분, 점심 12:30~13:30 → 10:00, 11:00, 13:30, 14:30
     @Transactional
     public int generateTimeSlots(Long popId, TimeSlotGenerateRequest request) { // popId는 URL에서 받음
-        PopupStore popup = findPopup(popId);
+        PopupStore popup = findPopupForUpdate(popId); // 생성 버튼을 두 번 눌러도 회차가 중복 생성되지 않도록
         fillDefaults(popup, request);
         checkGenerate(popup, request);
 
@@ -132,6 +133,12 @@ public class TimeSlotService {
                 .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
     }
 
+    // 팝업 조회 + 락 : 같은 팝업에 회차를 등록하는 요청은 한 번에 하나씩 처리됨
+    private PopupStore findPopupForUpdate(Long popId) {
+        return popupRepo.findByIdWithPessimisticLock(popId)
+                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
+    }
+
     private TimeSlot findTimeSlot(Long timeSlotId) {
         return timeSlotRepo.findById(timeSlotId)
                 .orElseThrow(() -> new TimeSlotException(TimeSlotErrorCode.TIMESLOT_NOT_FOUND));
@@ -170,7 +177,7 @@ public class TimeSlotService {
         if (request.getLunchStart() != null) {
             checkTimeRange(request.getLunchStart(), request.getLunchEnd());
         }
-        if (request.getIntervalMinutes() <= 0) {
+        if (request.getIntervalMinutes() < MIN_INTERVAL_MINUTES) {
             throw new TimeSlotException(TimeSlotErrorCode.INVALID_INTERVAL);
         }
         if (request.getBreakMinutes() < 0) {

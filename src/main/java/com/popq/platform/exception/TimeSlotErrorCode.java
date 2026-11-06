@@ -21,7 +21,7 @@ public enum TimeSlotErrorCode {
     GENERATE_PERIOD_OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "생성 기간은 팝업 운영기간 안이어야 합니다."),
     SLOT_TIME_OUT_OF_RESERV_TIME(HttpStatus.BAD_REQUEST, "회차 시간은 팝업 예약 시간 안이어야 합니다."),
     LUNCH_TIME_PAIR_REQUIRED(HttpStatus.BAD_REQUEST, "점심시간은 lunchStart, lunchEnd를 같이 입력해주세요."),
-    INVALID_INTERVAL(HttpStatus.BAD_REQUEST, "회차 간격은 1분 이상이어야 합니다."),
+    INVALID_INTERVAL(HttpStatus.BAD_REQUEST, "회차 간격은 30분 이상이어야 합니다."),
     INVALID_BREAK_MINUTES(HttpStatus.BAD_REQUEST, "정비시간은 0분 이상이어야 합니다.");
 
     private final HttpStatus status;
