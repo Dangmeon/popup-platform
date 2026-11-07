@@ -27,5 +27,19 @@ public class OrderItem {
     private Integer quantity;
 
     @Column(name = "PRICE", nullable = false)
-    private Long price;
+    private int price;
+
+    public void assignOrder(Order order) {
+        this.order = order;
+    }
+
+    public static OrderItem createOrderItem(Product product, Integer quantity, int price) {
+        OrderItem orderItem = new OrderItem();
+
+        orderItem.product = product;
+        orderItem.quantity = quantity;
+        orderItem.price = price;
+
+        return orderItem;
+    }
 }

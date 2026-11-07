@@ -43,6 +43,8 @@ public class SecurityConfig {
                         // 3. 테스트용 API 등 인증이 필요한 경로 설정
                         .requestMatchers("/api/test").authenticated()
 
+                        .requestMatchers("/api/popups/**").permitAll()
+
                         // 4. 그 외 나머지 요청은 인증된 사용자 모두 접근 가능
                         .anyRequest().authenticated()
                 )
