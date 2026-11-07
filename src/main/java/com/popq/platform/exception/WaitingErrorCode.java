@@ -25,6 +25,7 @@ public enum WaitingErrorCode {
     ALREADY_CALLED(HttpStatus.BAD_REQUEST, "이미 호출된 대기입니다."),
     ALREADY_ENTERED(HttpStatus.BAD_REQUEST, "이미 입장된 대기 입니다."),
     ALREADY_EXPIRED(HttpStatus.BAD_REQUEST, "이미 만료처리된 대기 입니다."),
+    CHECK_IN_EXPIRED(HttpStatus.BAD_REQUEST, "입장 가능 시간이 초과되었습니다."),
     INVALID_STATUS_FOR_CALL(HttpStatus.BAD_REQUEST, "대기 중 상태일 때만 호출할 수 있습니다."),
     NOT_CALLED_YET(HttpStatus.BAD_REQUEST, "호출 상태인 대기 팀만 처리할 수 있습니다."),
 

@@ -1,5 +1,6 @@
 package com.popq.platform.service;
 
+import com.popq.platform.dto.CheckInRequest;
 import com.popq.platform.dto.WaitingRegisterRequest;
 import com.popq.platform.dto.WaitingStatusResponse;
 import com.popq.platform.entity.PopupStore;
@@ -231,6 +232,26 @@ public class WaitingService {
         }
 
         log.info("[스케줄러] 총 {}건의 대기가 입장 시간 초과로 EXPIRED 처리되었습니다.", expiredList.size());
+    }
+
+    @Transactional
+    public WaitingStatusResponse checkIn(CheckInRequest request) {
+        // checkInCode에서 waitingId ("CHK-0005-0010" 일 경우 10) 파싱
+        Long waitingId = parseWaitingIdFromCheckInCode(request.getCheckInCode());
+        // 만든 enterWaiting만 그대로 호출
+        return enterWaiting(waitingId);
+    }
+
+    private Long parseWaitingIdFromCheckInCode(String checkInCode) { // 체크인 코드에서 waitingId 추출하는 메소드
+        try {
+            String[] parts = checkInCode.split("-");
+            if (parts.length != 3 || !parts[0].equals("CHK")) {
+                throw new WaitingException(WaitingErrorCode.WAITING_NOT_FOUND);
+            }
+            return Long.parseLong(parts[2]);
+        } catch (Exception e) {
+            throw new WaitingException(WaitingErrorCode.WAITING_NOT_FOUND);
+        }
     }
 
     // 웹소켓 전달 메소드

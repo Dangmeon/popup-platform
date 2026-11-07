@@ -86,6 +86,11 @@ public class WaitingQueue {
         if (this.waitingStatus != WaitingStatus.CALLED) { // 호출 상태일때만 입장 가능
             throw new WaitingException(WaitingErrorCode.NOT_CALLED_YET);
         }
+
+        if (this.expiresAt != null && LocalDateTime.now().isAfter(this.expiresAt)) { // 만약 만료 시간이 초과되었을 경우 검증
+            throw new WaitingException(WaitingErrorCode.CHECK_IN_EXPIRED); // 예외 던지기
+        }
+
         this.waitingStatus = WaitingStatus.ENTERED; // 상태 'ENTERED'
         this.enteredAt = LocalDateTime.now(); // 보류 : 칼럼이 아직 DB에 없음 추가 시 @Transient만 지우고 반영하면 됨
     } // 입장 할 때 (CALLED -> ENTERED)
