@@ -1,10 +1,11 @@
-package com.popq.platform.service;
+package com.popq.platform.reservation.service;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
+import com.popq.platform.dto.TimeSlotChangedEvent;
 import com.popq.platform.reservation.dto.ReservationCreateRequest;
 import com.popq.platform.reservation.dto.ReservationDetailResponse;
 import com.popq.platform.reservation.dto.ReservationResponse;
@@ -36,8 +37,8 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final TimeSlotRepository timeSlotRepository;
     private final UserRepository userRepository;
-    private final ReservationExpirationService reservationExpirationService;
     private final ReservationHoldRedisService reservationHoldRedisService;
+    private final ReservationExpirationService reservationExpirationService;
     private final ApplicationEventPublisher eventPublisher; // Spring 안에서 이벤트를 발생시키는 역할
 
     private static final int MAX_PEOPLE_COUNT = 3;
@@ -194,20 +195,11 @@ public class ReservationService {
         /**
          *  나중에 레디스 구현 시 별도 서비스에서 처리 후 호출하게
          * **/
-        TimeSlot timeSlot = timeSlotRepository.findByIdForUpdate(reservation.getTimeSlot().getTimeSlotId())
-                .orElseThrow(() -> new ReservationException(ReservationErrorCode.TIMESLOT_NOT_FOUND));
-
         LocalDateTime now = LocalDateTime.now();
 
         if(!now.isBefore(reservation.getExpiresAt())){
 
             reservationExpirationService.expireReservation(reservationId);
-
-            eventPublisher.publishEvent(
-                    new TimeSlotChangedEvent(
-                            timeSlot.getTimeSlotId()
-                    )
-            );
 
             return ReservationResponse.fromReservation(reservation);
         }

@@ -1,5 +1,6 @@
 package com.popq.platform.reservation.service;
 
+import com.popq.platform.dto.TimeSlotChangedEvent;
 import com.popq.platform.entity.Reservation;
 import com.popq.platform.entity.ReservationStatus;
 import com.popq.platform.entity.TimeSlot;
@@ -8,6 +9,7 @@ import com.popq.platform.reservation.exception.ReservationException;
 import com.popq.platform.reservation.repository.ReservationRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,7 @@ public class ReservationExpirationService {
 
     private final ReservationRepository reservationRepository;
     private final TimeSlotRepository timeSlotRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void expireReservation(Long reservationId) {
@@ -41,6 +44,10 @@ public class ReservationExpirationService {
         timeSlot.decreaseReservedCount(reservation.getPeopleCount());
 
         reservation.expire();
+
+        eventPublisher.publishEvent(
+                new TimeSlotChangedEvent(timeSlotId)
+        );
     }
 
 }
