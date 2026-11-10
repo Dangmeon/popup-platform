@@ -55,4 +55,37 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
 
     }
+
+    // 팝업 에러 처리
+    @ExceptionHandler(PopupException.class)
+    public ResponseEntity<Map<String, String>> handlePopupException(PopupException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 회차 에러 처리
+    @ExceptionHandler(TimeSlotException.class)
+    public ResponseEntity<Map<String, String>> handleTimeSlotException(TimeSlotException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 상품 에러 처리
+    @ExceptionHandler(ProductException.class)
+    public ResponseEntity<Map<String, String>> handleProductException(ProductException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
 }
