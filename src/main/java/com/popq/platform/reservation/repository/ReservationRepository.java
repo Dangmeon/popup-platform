@@ -1,13 +1,16 @@
-package com.popq.platform.repository;
+package com.popq.platform.reservation.repository;
 
 import com.popq.platform.entity.Reservation;
 import com.popq.platform.entity.ReservationStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
@@ -28,11 +31,21 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
         SELECT r
         FROM Reservation r
         WHERE r.reservationStatus = :status
-            AND r.expiresAt < :now
+            AND r.expiresAt <= :now
     """)
     List<Reservation> findExpiredReservations(
             @Param("status") ReservationStatus status,
             @Param("now") LocalDateTime now
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT r
+            FROM Reservation r
+            WHERE r.reservationId = :reservationId
+    """)
+    Optional<Reservation> findByIdForUpdate(
+            @Param("reservationId") Long reservationId
     );
 
     // 해당 회차에 예약 이력이 하나라도 존재하는지 확인

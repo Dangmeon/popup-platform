@@ -10,7 +10,7 @@ import com.popq.platform.exception.PopupException;
 import com.popq.platform.exception.TimeSlotErrorCode;
 import com.popq.platform.exception.TimeSlotException;
 import com.popq.platform.repository.PopupStoreRepository;
-import com.popq.platform.repository.ReservationRepository;
+import com.popq.platform.reservation.repository.ReservationRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;

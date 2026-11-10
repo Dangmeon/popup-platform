@@ -1,4 +1,4 @@
-package com.popq.platform.dto;
+package com.popq.platform.reservation.dto;
 
 import com.popq.platform.entity.Reservation;
 import com.popq.platform.entity.ReservationStatus;
