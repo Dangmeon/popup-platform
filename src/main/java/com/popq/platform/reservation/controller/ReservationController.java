@@ -1,10 +1,10 @@
-package com.popq.platform.controller;
+package com.popq.platform.reservation.controller;
 
-import com.popq.platform.dto.ReservationCreateRequest;
-import com.popq.platform.dto.ReservationDetailResponse;
-import com.popq.platform.dto.ReservationResponse;
-import com.popq.platform.dto.ReservationUpdateRequest;
-import com.popq.platform.service.ReservationService;
+import com.popq.platform.reservation.dto.ReservationCreateRequest;
+import com.popq.platform.reservation.dto.ReservationDetailResponse;
+import com.popq.platform.reservation.dto.ReservationResponse;
+import com.popq.platform.reservation.dto.ReservationUpdateRequest;
+import com.popq.platform.reservation.service.ReservationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
