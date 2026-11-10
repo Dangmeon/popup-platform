@@ -1,4 +1,4 @@
-package com.popq.platform.reservation.service;
+package com.popq.platform.reservation.redis;
 
 import com.popq.platform.dto.TimeSlotChangedEvent;
 import com.popq.platform.entity.Reservation;
