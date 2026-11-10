@@ -15,6 +15,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByUsername(String username);
 
+    boolean existsByUsername(String username);
+
     @Query("SELECT u FROM User u WHERE u.status = :status AND u.withdrawnAt < :targetDate")
     List<User> findExpiredUsers(
             @Param("status") User.UserStatus status,
