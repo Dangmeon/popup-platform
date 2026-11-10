@@ -64,7 +64,6 @@ public class Order {
         orderItem.assignOrder(this);
     }
 
-
     public static Order createOrder(User user, int totalPrice, LocalDateTime expiresAt){
         Order order = new Order();
 

@@ -33,7 +33,7 @@ public class OrderService {
     public OrderResponse createOrder(Long memberId, OrderCreateRequest request) {
 
         // 로그인 회원 조회
-        User user = userRepository.findById(memberId)
+        User user = userRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("회원이 없습니다."));
 
         int totalPrice = 0;
