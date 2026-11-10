@@ -5,6 +5,10 @@ import com.popq.platform.dto.TimeSlotRequest;
 import com.popq.platform.dto.TimeSlotResponse;
 import com.popq.platform.entity.PopupStore;
 import com.popq.platform.entity.TimeSlot;
+import com.popq.platform.exception.PopupErrorCode;
+import com.popq.platform.exception.PopupException;
+import com.popq.platform.exception.TimeSlotErrorCode;
+import com.popq.platform.exception.TimeSlotException;
 import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.reservation.repository.ReservationRepository;
 import com.popq.platform.repository.TimeSlotRepository;
@@ -23,6 +27,7 @@ import java.util.List;
 public class TimeSlotService {
 
     private static final String TIME_REGEX = "^([01]\\d|2[0-3]):[0-5]\\d$"; // HH:mm
+    private static final int MIN_INTERVAL_MINUTES = 30; // 자동 생성 회차 간격 최소값 (분)
 
     TimeSlotRepository timeSlotRepo;
     PopupStoreRepository popupRepo;
@@ -37,11 +42,12 @@ public class TimeSlotService {
 
     // 회차 목록 (date가 있으면 그 날짜만)
     public List<TimeSlotResponse> listTimeSlot(Long popId, LocalDate date) {
+        findPopup(popId); // 없는 팝업이면 404
         List<TimeSlot> entityList;
         if (date != null) {
-            entityList = timeSlotRepo.findByPopupStore_PopIdAndSlotDateOrderByStartTimeAsc(popId, date);
+            entityList = timeSlotRepo.findByPopIdAndDate(popId, date);
         } else {
-            entityList = timeSlotRepo.findByPopupStore_PopIdOrderBySlotDateAscStartTimeAsc(popId);
+            entityList = timeSlotRepo.findByPopId(popId);
         }
         return toDtoList(entityList);
     }
@@ -53,11 +59,11 @@ public class TimeSlotService {
     // 회차 1개 등록 : 등록된 회차 정보 반환
     @Transactional
     public TimeSlotResponse insertTimeSlot(Long popId, TimeSlotRequest request) { // popId는 URL에서 받음
-        PopupStore popup = findPopup(popId);
+        PopupStore popup = findPopupForUpdate(popId); // 동시에 등록해도 겹치는 회차가 생기지 않도록
         checkTimeSlot(popup, request);
-        if (timeSlotRepo.existsByPopupStore_PopIdAndSlotDateAndStartTimeLessThanAndEndTimeGreaterThan(
-                popup.getPopId(), request.getSlotDate(), request.getEndTime(), request.getStartTime())) {
-            throw new IllegalArgumentException("같은 날짜에 시간이 겹치는 회차가 이미 있습니다.");
+        if (timeSlotRepo.existsOverlap(
+                popup.getPopId(), request.getSlotDate(), request.getStartTime(), request.getEndTime())) {
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_OVERLAP);
         }
         TimeSlot saved = timeSlotRepo.save(TimeSlot.toEntity(null, popup, request, 0));
         return TimeSlotResponse.toDto(saved); // timeSlotId 대신 회차 정보 전체 반환
@@ -67,7 +73,7 @@ public class TimeSlotService {
     // 예) 10:00~16:00, 60분, 점심 12:30~13:30 → 10:00, 11:00, 13:30, 14:30
     @Transactional
     public int generateTimeSlots(Long popId, TimeSlotGenerateRequest request) { // popId는 URL에서 받음
-        PopupStore popup = findPopup(popId);
+        PopupStore popup = findPopupForUpdate(popId); // 생성 버튼을 두 번 눌러도 회차가 중복 생성되지 않도록
         fillDefaults(popup, request);
         checkGenerate(popup, request);
 
@@ -81,7 +87,7 @@ public class TimeSlotService {
 
     // 예약 이력이 있으면(취소, 만료 포함) 날짜/시간은 못 바꾸고 정원만 변경 가능
     @Transactional
-    public void updateTimeSlot(Long timeSlotId, TimeSlotRequest request) {
+    public TimeSlotResponse updateTimeSlot(Long timeSlotId, TimeSlotRequest request) {
         TimeSlot slot = findTimeSlotForUpdate(timeSlotId); // 락 : 수정 중에 예약 인원이 바뀌지 않도록
         PopupStore popup = slot.getPopupStore();
         checkTimeSlot(popup, request);
@@ -91,17 +97,18 @@ public class TimeSlotService {
                     || !slot.getStartTime().equals(request.getStartTime())
                     || !slot.getEndTime().equals(request.getEndTime());
             if (changed) {
-                throw new IllegalArgumentException("예약 이력이 있는 회차는 날짜와 시간을 바꿀 수 없습니다. 정원만 변경 가능합니다.");
+                throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_TIME_LOCKED);
             }
         }
         if (request.getCapacity() < slot.getReservedCount()) {
-            throw new IllegalArgumentException("정원은 현재 예약 인원(" + slot.getReservedCount() + "명)보다 적을 수 없습니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.CAPACITY_BELOW_RESERVED);
         }
-        if (timeSlotRepo.existsByPopupStore_PopIdAndSlotDateAndStartTimeLessThanAndEndTimeGreaterThanAndTimeSlotIdNot(
-                popup.getPopId(), request.getSlotDate(), request.getEndTime(), request.getStartTime(), timeSlotId)) {
-            throw new IllegalArgumentException("같은 날짜에 시간이 겹치는 회차가 이미 있습니다.");
+        if (timeSlotRepo.existsOverlapExceptSelf(
+                popup.getPopId(), request.getSlotDate(), request.getStartTime(), request.getEndTime(), timeSlotId)) {
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_OVERLAP);
         }
         slot.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE (예약 인원은 그대로)
+        return TimeSlotResponse.toDto(slot);
     }
 
     // 예약이 있거나 예약 이력이 있으면 삭제 불가
@@ -109,34 +116,37 @@ public class TimeSlotService {
     public void deleteTimeSlot(Long timeSlotId) {
         TimeSlot slot = findTimeSlotForUpdate(timeSlotId); // 락 : 삭제 중에 예약이 들어오지 않도록
         if (reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId)) { // 취소, 만료된 예약도 포함
-            throw new IllegalArgumentException("예약 이력이 있는 회차는 삭제할 수 없습니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_HAS_RESERVATIONS);
         }
         try { // FK 제약조건으로 한 번 더 막음
             timeSlotRepo.delete(slot);
             timeSlotRepo.flush(); // 여기서 바로 DELETE 실행해야 FK 에러를 잡을 수 있음
         } catch (DataIntegrityViolationException e) {
-            throw new IllegalArgumentException("예약 이력이 있는 회차는 삭제할 수 없습니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_HAS_RESERVATIONS);
         }
     }
 
     // ---------------- 내부 메소드 ----------------
 
     private PopupStore findPopup(Long popId) {
-        if (popId == null) {
-            throw new IllegalArgumentException("popId는 필수입니다.");
-        }
         return popupRepo.findById(popId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팝업입니다. popId=" + popId));
+                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
+    }
+
+    // 팝업 조회 + 락 : 같은 팝업에 회차를 등록하는 요청은 한 번에 하나씩 처리됨
+    private PopupStore findPopupForUpdate(Long popId) {
+        return popupRepo.findByIdWithPessimisticLock(popId)
+                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
     }
 
     private TimeSlot findTimeSlot(Long timeSlotId) {
         return timeSlotRepo.findById(timeSlotId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회차입니다. timeSlotId=" + timeSlotId));
+                .orElseThrow(() -> new TimeSlotException(TimeSlotErrorCode.TIMESLOT_NOT_FOUND));
     }
 
     private TimeSlot findTimeSlotForUpdate(Long timeSlotId) {
         return timeSlotRepo.findByIdForUpdate(timeSlotId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회차입니다. timeSlotId=" + timeSlotId));
+                .orElseThrow(() -> new TimeSlotException(TimeSlotErrorCode.TIMESLOT_NOT_FOUND));
     }
 
     private List<TimeSlotResponse> toDtoList(List<TimeSlot> entityList) {
@@ -160,26 +170,27 @@ public class TimeSlotService {
 
     private void checkGenerate(PopupStore popup, TimeSlotGenerateRequest request) {
         checkPopupPeriod(popup);
-        checkTimeRange(request.getStartTime(), request.getEndTime(), "생성 시간");
+        checkTimeRange(request.getStartTime(), request.getEndTime());
         if ((request.getLunchStart() == null) != (request.getLunchEnd() == null)) {
-            throw new IllegalArgumentException("점심시간은 lunchStart, lunchEnd를 같이 입력해주세요.");
+            throw new TimeSlotException(TimeSlotErrorCode.LUNCH_TIME_PAIR_REQUIRED);
         }
         if (request.getLunchStart() != null) {
-            checkTimeRange(request.getLunchStart(), request.getLunchEnd(), "점심시간");
+            checkTimeRange(request.getLunchStart(), request.getLunchEnd());
         }
-        if (request.getIntervalMinutes() <= 0) {
-            throw new IllegalArgumentException("회차 간격은 1분 이상이어야 합니다.");
+        if (request.getIntervalMinutes() < MIN_INTERVAL_MINUTES) {
+            throw new TimeSlotException(TimeSlotErrorCode.INVALID_INTERVAL);
         }
         if (request.getBreakMinutes() < 0) {
-            throw new IllegalArgumentException("정비시간은 0분 이상이어야 합니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.INVALID_BREAK_MINUTES);
         }
         if (request.getCapacity() == null || request.getCapacity() <= 0) {
-            throw new IllegalArgumentException("회차 정원은 1명 이상이어야 합니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.INVALID_CAPACITY);
         }
         if (request.getStartDate().isBefore(popup.getStartDate()) || request.getEndDate().isAfter(popup.getEndDate())
                 || request.getStartDate().isAfter(request.getEndDate())) {
-            throw new IllegalArgumentException("생성 기간은 팝업 운영기간 안이어야 합니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.GENERATE_PERIOD_OUT_OF_RANGE);
         }
+        checkReservTime(popup, request.getStartTime(), request.getEndTime()); // 생성 시간도 팝업 예약 시간 안
     }
 
     // 하루치 회차 목록 만들기 (저장은 generateTimeSlots에서)
@@ -190,7 +201,7 @@ public class TimeSlotService {
         LocalTime lunchEnd = request.getLunchEnd() != null ? LocalTime.parse(request.getLunchEnd()) : null;
 
         // 그날 이미 있는 회차 (시간 겹침 확인 + 회차 번호 계산, DB 조회는 하루 1번)
-        List<TimeSlot> existingSlots = timeSlotRepo.findByPopupStore_PopIdAndSlotDateOrderByStartTimeAsc(popup.getPopId(), date);
+        List<TimeSlot> existingSlots = timeSlotRepo.findByPopIdAndDate(popup.getPopId(), date);
         int maxSlotNum = 0;
         for (TimeSlot s : existingSlots) {
             if (s.getSlotNum() != null && s.getSlotNum() > maxSlotNum) {
@@ -243,20 +254,20 @@ public class TimeSlotService {
     // 팝업 운영기간이 없으면 회차를 만들 수 없음 (팝업 필수값 검증 이전에 등록된 팝업 대비)
     private void checkPopupPeriod(PopupStore popup) {
         if (popup.getStartDate() == null || popup.getEndDate() == null) {
-            throw new IllegalArgumentException("팝업 운영기간(시작일, 종료일)이 없어 회차를 만들 수 없습니다. 팝업 정보를 먼저 수정해주세요.");
+            throw new TimeSlotException(TimeSlotErrorCode.POPUP_PERIOD_MISSING);
         }
     }
 
     // 필수, HH:mm 형식, 시작 < 끝
-    private void checkTimeRange(String start, String end, String name) {
+    private void checkTimeRange(String start, String end) {
         if (start == null || end == null) {
-            throw new IllegalArgumentException(name + "의 시작과 끝을 입력해주세요.");
+            throw new TimeSlotException(TimeSlotErrorCode.TIME_REQUIRED);
         }
         if (!start.matches(TIME_REGEX) || !end.matches(TIME_REGEX)) {
-            throw new IllegalArgumentException(name + "은(는) HH:mm 형식이어야 합니다. 예) 10:00");
+            throw new TimeSlotException(TimeSlotErrorCode.INVALID_TIME_FORMAT);
         }
         if (start.compareTo(end) >= 0) { // HH:mm 형식이라 문자열 비교로 순서 판단 가능
-            throw new IllegalArgumentException(name + "의 끝은 시작보다 늦어야 합니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.INVALID_TIME_RANGE);
         }
     }
 
@@ -264,14 +275,26 @@ public class TimeSlotService {
     private void checkTimeSlot(PopupStore popup, TimeSlotRequest request) {
         checkPopupPeriod(popup);
         if (request.getSlotDate() == null || request.getCapacity() == null) {
-            throw new IllegalArgumentException("slotDate, capacity는 필수입니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_REQUIRED_FIELD);
         }
-        checkTimeRange(request.getStartTime(), request.getEndTime(), "회차 시간");
+        checkTimeRange(request.getStartTime(), request.getEndTime());
         if (request.getCapacity() <= 0) {
-            throw new IllegalArgumentException("회차 정원은 1명 이상이어야 합니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.INVALID_CAPACITY);
         }
         if (request.getSlotDate().isBefore(popup.getStartDate()) || request.getSlotDate().isAfter(popup.getEndDate())) {
-            throw new IllegalArgumentException("회차 날짜는 팝업 운영기간(" + popup.getStartDate() + " ~ " + popup.getEndDate() + ") 안이어야 합니다.");
+            throw new TimeSlotException(TimeSlotErrorCode.SLOT_DATE_OUT_OF_PERIOD);
+        }
+        checkReservTime(popup, request.getStartTime(), request.getEndTime());
+    }
+
+    // 팝업 예약 시간 안인지 : 예약 시작보다 일찍 시작하거나 예약 종료보다 늦게 끝나면 안 됨
+    // 팝업에 예약 시간이 비어 있으면 제한 없음 / HH:mm 형식이라 문자열 비교로 판단
+    private void checkReservTime(PopupStore popup, String start, String end) {
+        if (popup.getReservStart() != null && start.compareTo(popup.getReservStart()) < 0) {
+            throw new TimeSlotException(TimeSlotErrorCode.SLOT_TIME_OUT_OF_RESERV_TIME);
+        }
+        if (popup.getReservEnd() != null && end.compareTo(popup.getReservEnd()) > 0) {
+            throw new TimeSlotException(TimeSlotErrorCode.SLOT_TIME_OUT_OF_RESERV_TIME);
         }
     }
 }

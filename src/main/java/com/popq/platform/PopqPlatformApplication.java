@@ -11,5 +11,4 @@ public class PopqPlatformApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(PopqPlatformApplication.class, args);
 	}
-
 }
