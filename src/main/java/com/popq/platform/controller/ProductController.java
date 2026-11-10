@@ -39,8 +39,8 @@ public class ProductController {
 
     // 상품 수정 (재고는 수정되지 않음, 판매 시작 후에는 판매 시작일시 변경 불가)
     @PutMapping("/api/admin/products/{prdId}")
-    public void updateProduct(@PathVariable("prdId") Long prdId, @RequestBody ProductRequest request) {
-        service.updateProduct(prdId, request);
+    public ProductResponse updateProduct(@PathVariable("prdId") Long prdId, @RequestBody ProductRequest request) {
+        return service.updateProduct(prdId, request);
     }
 
     // 재고 조정

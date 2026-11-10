@@ -16,8 +16,9 @@ public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
     @Query("SELECT p FROM PopupStore p WHERE p.startDate <= :today AND p.endDate >= :today ORDER BY p.startDate DESC")
     List<PopupStore> findOngoing(@Param("today") LocalDate today);
 
-    // 카테고리별 조회 (메소드 이름만으로 쿼리 자동 생성)
-    List<PopupStore> findByCategoryOrderByStartDateDesc(String category);
+    // 카테고리별 조회 (시작일 최신순)
+    @Query("SELECT p FROM PopupStore p WHERE p.category = :category ORDER BY p.startDate DESC")
+    List<PopupStore> findByCategory(@Param("category") String category);
 
     // [웨이팅 연동] 비관적 락 조회 - 대기번호 중복 발급 방지
     @Lock(LockModeType.PESSIMISTIC_WRITE)
