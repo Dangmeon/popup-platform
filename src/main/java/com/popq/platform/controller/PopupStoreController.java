@@ -55,8 +55,8 @@ public class PopupStoreController {
 
     // 팝업 수정
     @PutMapping("/api/admin/popups/{popId}")
-    public void updatePopup(@PathVariable("popId") Long popId, @RequestBody PopupStoreRequest request) {
-        service.updatePopup(popId, request);
+    public PopupStoreResponse updatePopup(@PathVariable("popId") Long popId, @RequestBody PopupStoreRequest request) {
+        return service.updatePopup(popId, request);
     }
 
     // 팝업 삭제

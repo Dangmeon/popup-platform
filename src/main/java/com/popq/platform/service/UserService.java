@@ -49,6 +49,11 @@ public class UserService {
         User user = userRepository.findByUsername(requestDto.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이메일(아이디)입니다."));
 
+        // 탈퇴한 회원인지 확인
+        if (user.getStatus() == User.UserStatus.WITHDRAWN) {
+            throw new IllegalArgumentException("탈퇴한 회원입니다.");
+        }
+
         if (!passwordEncoder.matches(requestDto.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
@@ -95,7 +100,7 @@ public class UserService {
         User user = userRepository.findByUsername(email)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
 
-        // 이름 및 전화번호 수정 (Entity에 해당 메서드가 구현되어 있어야 합니다)
+        // 이름 및 전화번호 수정
         user.updateMemberInfo(requestDto.getName(), requestDto.getPhone());
 
         // 비밀번호 수정 요청이 있는 경우 암호화 후 반영
@@ -106,5 +111,21 @@ public class UserService {
 
         // 수정된 회원 정보를 담아 응답 DTO 반환
         return MemberInfoResponse.from(user);
+    }
+
+    // 회원탈퇴 로직 (Soft Delete)
+    @Transactional
+    public void withdraw(String username) {
+        // 1. 회원 존재 여부 확인
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+
+        // 2. 이미 탈퇴된 회원인지 방어 검증
+        if (user.getStatus() == User.UserStatus.WITHDRAWN) {
+            throw new IllegalArgumentException("이미 탈퇴 처리된 회원입니다.");
+        }
+
+        // 3. Soft Delete 상태 변경 (ACTIVE -> WITHDRAWN, withdrawnAt 기록)
+        user.withdraw();
     }
 }

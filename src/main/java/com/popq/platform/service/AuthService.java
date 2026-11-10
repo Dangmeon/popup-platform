@@ -1,6 +1,7 @@
 package com.popq.platform.service;
 
 import com.popq.platform.dto.PasswordFindRequest;
+import com.popq.platform.dto.SignupRequest; // 1. SignupRequest 임포트 추가
 import com.popq.platform.entity.User;
 import com.popq.platform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,26 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender javaMailSender;
+
+    @Transactional
+    public void signup(SignupRequest requestDto) {
+        // 이메일(아이디) 중복 검사
+        if (userRepository.existsByUsername(requestDto.getUsername())) {
+            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+        }
+
+        // 비밀번호 암호화 및 유저 생성
+        String encodedPassword = passwordEncoder.encode(requestDto.getPassword());
+
+        User user = User.builder()
+                .username(requestDto.getUsername())
+                .password(encodedPassword)
+                .name(requestDto.getName())
+                .phone(requestDto.getPhone())
+                .build();
+
+        userRepository.save(user);
+    }
 
     @Transactional
     public void findAndSendTempPassword(PasswordFindRequest requestDto) {
