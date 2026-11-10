@@ -16,27 +16,31 @@ public class GlobalExceptionHandler {
 
     // 1. DTO 유효성 검증(@Valid) 실패 시 발생하는 에러 처리
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Object> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
-            errors.put(error.getField(), error.getDefaultMessage());
+            errors.putIfAbsent(error.getField(), error.getDefaultMessage());
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
     }
 
-    // 2. 비즈니스 로직 예외 처리 (아이디/비밀번호 오류 등)
+    // 2. 비즈니스 로직 예외 처리
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
+    public ResponseEntity<Object> handleIllegalArgumentException(IllegalArgumentException ex) {
         Map<String, String> error = new HashMap<>();
-        error.put("error", ex.getMessage());
+        error.put("message", ex.getMessage()); // 프론트엔드가 'message'로 읽을 때 대응
+        error.put("error", ex.getMessage());   // 기존 호환용
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
-    // 3. 데이터베이스 제약 조건 위반 (전화번호/이메일 중복 등 DB 에러) 처리
+    // 3. 데이터베이스 제약 조건 위반 처리
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<Map<String, String>> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+    public ResponseEntity<Object> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
         Map<String, String> error = new HashMap<>();
-        error.put("error", "이미 사용 중인 정보(전화번호 등)입니다.");
+        String errorMessage = "이미 사용 중인 정보(이메일 또는 전화번호 등)입니다.";
+
+        error.put("message", errorMessage);
+        error.put("error", errorMessage);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
@@ -50,5 +54,38 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
 
+    }
+
+    // 팝업 에러 처리
+    @ExceptionHandler(PopupException.class)
+    public ResponseEntity<Map<String, String>> handlePopupException(PopupException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 회차 에러 처리
+    @ExceptionHandler(TimeSlotException.class)
+    public ResponseEntity<Map<String, String>> handleTimeSlotException(TimeSlotException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 상품 에러 처리
+    @ExceptionHandler(ProductException.class)
+    public ResponseEntity<Map<String, String>> handleProductException(ProductException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
     }
 }

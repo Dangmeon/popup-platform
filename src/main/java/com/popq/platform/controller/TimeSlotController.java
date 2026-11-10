@@ -56,8 +56,8 @@ public class TimeSlotController {
 
     // 회차 수정 (예약이 있으면 정원만 변경 가능)
     @PutMapping("/api/admin/slots/{timeSlotId}")
-    public void updateTimeSlot(@PathVariable("timeSlotId") Long timeSlotId, @RequestBody TimeSlotRequest request) {
-        service.updateTimeSlot(timeSlotId, request);
+    public TimeSlotResponse updateTimeSlot(@PathVariable("timeSlotId") Long timeSlotId, @RequestBody TimeSlotRequest request) {
+        return service.updateTimeSlot(timeSlotId, request);
     }
 
     // 회차 삭제 (예약이나 예약 이력이 있으면 삭제 불가)

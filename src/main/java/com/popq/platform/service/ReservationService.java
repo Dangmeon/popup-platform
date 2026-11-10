@@ -5,10 +5,7 @@ import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
-import com.popq.platform.dto.ReservationCreateRequest;
-import com.popq.platform.dto.ReservationDetailResponse;
-import com.popq.platform.dto.ReservationResponse;
-import com.popq.platform.dto.ReservationUpdateRequest;
+import com.popq.platform.dto.*;
 import com.popq.platform.entity.Reservation;
 import com.popq.platform.entity.ReservationStatus;
 import com.popq.platform.entity.TimeSlot;
@@ -19,6 +16,7 @@ import com.popq.platform.repository.ReservationRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import com.popq.platform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +34,7 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final TimeSlotRepository timeSlotRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher; // Spring 안에서 이벤트를 발생시키는 역할
 
     private static final int MAX_PEOPLE_COUNT = 3;
     private static final int HOLD_EXPIRE_MINUTES = 10;
@@ -108,6 +107,14 @@ public class ReservationService {
 
         // 8. reservedCount 증가
         timeSlot.increaseReservedCount(request.peopleCount());
+
+        // Sprint 내부에 TimeSlot 상태가 변한 걸 알림
+        // 이벤트만 발생시킴
+        eventPublisher.publishEvent(
+                new TimeSlotChangedEvent(
+                        timeSlot.getTimeSlotId()
+                )
+        );
 
         // 9. HOLD 예약 생성
         // 10. expiresAt 설정
@@ -184,6 +191,12 @@ public class ReservationService {
         if(!now.isBefore(reservation.getExpiresAt())){
             reservation.expire();
             timeSlot.decreaseReservedCount(reservation.getPeopleCount());
+
+            eventPublisher.publishEvent(
+                    new TimeSlotChangedEvent(
+                            timeSlot.getTimeSlotId()
+                    )
+            );
 
             return ReservationResponse.fromReservation(reservation);
         }
@@ -296,9 +309,21 @@ public class ReservationService {
 
                 oldTimeSlot.increaseReservedCount(difference);
 
+                eventPublisher.publishEvent(
+                        new TimeSlotChangedEvent(
+                                oldTimeSlot.getTimeSlotId()
+                        )
+                );
+
                 // 11. 인원이 감소하는 경우 감소한 인원만큼 정원 복구
             }else if (difference < 0) {
                 oldTimeSlot.decreaseReservedCount(Math.abs(difference));
+
+                eventPublisher.publishEvent(
+                        new TimeSlotChangedEvent(
+                                oldTimeSlot.getTimeSlotId()
+                        )
+                );
             }
 
             // 12. 예약 인원 변경
@@ -315,6 +340,18 @@ public class ReservationService {
 
             // 15. 새 회차에 변경할 예약 인원만큼 정원 증가
             newTimeSlot.increaseReservedCount(request.peopleCount());
+
+            eventPublisher.publishEvent(
+                    new TimeSlotChangedEvent(
+                            oldTimeSlot.getTimeSlotId()
+                    )
+            );
+
+            eventPublisher.publishEvent(
+                    new TimeSlotChangedEvent(
+                            newTimeSlot.getTimeSlotId()
+                    )
+            );
 
             // 16. 예약의 회차 및 인원 변경
             reservation.updateTimeSlot(newTimeSlot, request.peopleCount());
@@ -368,6 +405,12 @@ public class ReservationService {
 
         // 7. reserved_count에서 peopleCount만큼 복구
         timeSlot.decreaseReservedCount(reservation.getPeopleCount());
+
+        eventPublisher.publishEvent(
+                new TimeSlotChangedEvent(
+                        timeSlot.getTimeSlotId()
+                )
+        );
 
         // 6. CANCELLED로 변경
         reservation.cancel();
