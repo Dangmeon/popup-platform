@@ -1,5 +1,9 @@
-package com.popq.platform.entity;
+package com.popq.platform.waiting.entity;
 
+import com.popq.platform.entity.PopupStore;
+import com.popq.platform.waiting.entity.WaitingStatus;
+import com.popq.platform.waiting.exception.WaitingErrorCode;
+import com.popq.platform.waiting.exception.WaitingException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -64,9 +68,12 @@ public class WaitingQueue {
     } // 등록 될 때
 
     public void call(int timeoutMinutes) {
+        if (this.waitingStatus == WaitingStatus.CALLED) { // CALLED 상태인데 또 호출한다면 예외던지기
+            throw new WaitingException(WaitingErrorCode.ALREADY_CALLED); // 400 이미 호출된 대기입니다.
+        }
         if (this.waitingStatus != WaitingStatus.WAITING) { // WAITING 상태가 아니라면 예외 던지기
-            throw new IllegalStateException("대기 상태인 대기열만 호출할 수 있습니다. 현재 상태: " + this.waitingStatus);
-        } //
+            throw new WaitingException(WaitingErrorCode.INVALID_STATUS_FOR_CALL); // 400 대기 중 상태일 때만 호출할 수 있습니다.
+        }
 
         LocalDateTime now = LocalDateTime.now(); // 현재 시간 객체 생성
         this.waitingStatus = WaitingStatus.CALLED; // called로 변경
@@ -76,40 +83,41 @@ public class WaitingQueue {
 
 
     public void enter() {
-        validateEnterable();  // 입장 확인용 메소드
+        validateNotTerminated();
+
+        if (this.waitingStatus != WaitingStatus.CALLED) { // 호출 상태일때만 입장 가능
+            throw new WaitingException(WaitingErrorCode.NOT_CALLED_YET);
+        }
+
+        if (this.expiresAt != null && LocalDateTime.now().isAfter(this.expiresAt)) { // 만약 만료 시간이 초과되었을 경우 검증
+            throw new WaitingException(WaitingErrorCode.CHECK_IN_EXPIRED); // 예외 던지기
+        }
+
         this.waitingStatus = WaitingStatus.ENTERED; // 상태 'ENTERED'
         this.enteredAt = LocalDateTime.now(); // 보류 : 칼럼이 아직 DB에 없음 추가 시 @Transient만 지우고 반영하면 됨
     } // 입장 할 때 (CALLED -> ENTERED)
 
-    private void validateEnterable() { // 검증 (-> ENTERED)
-        if (this.waitingStatus == WaitingStatus.ENTERED) { // 완료된
-            throw new IllegalStateException("이미 입장 완료된 대기열입니다.");
+    // 공통 검증 메서드
+    private void validateNotTerminated() {
+        if (this.waitingStatus == WaitingStatus.ENTERED) { // 이미 입장 상태인 경우
+            throw new WaitingException(WaitingErrorCode.ALREADY_ENTERED);
         }
-        if (this.waitingStatus == WaitingStatus.CANCELLED) { // 취소된
-            throw new IllegalStateException("취소된 대기열은 입장 처리할 수 없습니다.");
+        if (this.waitingStatus == WaitingStatus.CANCELLED) { // 이미 취소 상태인 경우
+            throw new WaitingException(WaitingErrorCode.ALREADY_CANCELED);
         }
-        if (this.waitingStatus == WaitingStatus.EXPIRED) { // 만료된
-            throw new IllegalStateException("호출 시간이 만료된 대기열은 입장 처리할 수 없습니다.");
+        if (this.waitingStatus == WaitingStatus.EXPIRED) { // 이미 만료 상태인 경우
+            throw new WaitingException(WaitingErrorCode.ALREADY_EXPIRED);
         }
     }
 
     public void cancel() {
-        if (this.waitingStatus == WaitingStatus.ENTERED) {
-            throw new IllegalStateException("이미 입장 완료된 대기는 취소할 수 없습니다.");
-        }
-        if (this.waitingStatus == WaitingStatus.CANCELLED) {
-            throw new IllegalStateException("이미 취소된 대기입니다.");
-        }
-        if (this.waitingStatus == WaitingStatus.EXPIRED) {
-            throw new IllegalStateException("이미 만료 처리된 대기입니다.");
-        }
-
+        validateNotTerminated();
         this.waitingStatus = WaitingStatus.CANCELLED;
-    } // 취소 될 때
+    }
 
     public void expire() {
         if (this.waitingStatus != WaitingStatus.CALLED) { // 상태 'CALLED'
-            throw new IllegalStateException("호출 상태인 대기열만 만료 처리할 수 있습니다. 현재 상태: " + this.waitingStatus);
+            throw new WaitingException(WaitingErrorCode.NOT_CALLED_YET);
         }
         this.waitingStatus = WaitingStatus.EXPIRED;
     } // 만료 될 때 (CALLED -> EXPIRED)

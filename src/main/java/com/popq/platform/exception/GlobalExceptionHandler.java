@@ -1,5 +1,7 @@
 package com.popq.platform.exception;
 
+import com.popq.platform.waiting.exception.WaitingErrorCode;
+import com.popq.platform.waiting.exception.WaitingException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

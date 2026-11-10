@@ -1,4 +1,4 @@
-package com.popq.platform.entity;
+package com.popq.platform.waiting.entity;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
