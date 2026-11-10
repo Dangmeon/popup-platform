@@ -39,7 +39,7 @@ public class ReservationExpirationService {
 
         Long timeSlotId = reservation.getTimeSlot().getTimeSlotId();
         TimeSlot timeSlot = timeSlotRepository.findByIdForUpdate(timeSlotId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 회차가 없습ㄴ디ㅏ."));
+                .orElseThrow(() -> new IllegalArgumentException("해당 회차가 없습니다."));
 
         timeSlot.decreaseReservedCount(reservation.getPeopleCount());
 

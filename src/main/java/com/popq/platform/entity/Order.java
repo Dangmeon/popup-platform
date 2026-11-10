@@ -45,7 +45,7 @@ public class Order {
     }
 
     public void cancel() {
-        this.orderStatus = OrderStatus.CANCELED;
+        this.orderStatus = OrderStatus.CANCELLED;
     }
 
     public void expire() {
@@ -75,5 +75,4 @@ public class Order {
 
         return order;
     }
-
 }

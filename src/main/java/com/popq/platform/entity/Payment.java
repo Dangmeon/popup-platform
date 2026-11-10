@@ -58,7 +58,7 @@ public class Payment {
     }
 
     public void cancel(){
-        this.paymentStatus = PaymentStatus.CANCELED;
+        this.paymentStatus = PaymentStatus.CANCELLED;
         this.canceledAt = LocalDateTime.now();
     }
 }
