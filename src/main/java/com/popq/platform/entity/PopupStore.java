@@ -57,7 +57,19 @@ public class PopupStore {
     private Integer reservPeopleCap;
 
     @Column(name = "walkin_status")
-    private String walkinStatus;
+    @Builder.Default
+    private String walkinStatus = "OPEN";
+
+    // 운영 상태 : OPEN 정상 운영 / PAUSED 일시 중단 / CANCELLED 종료(복구 불가)
+    // 등록 시 항상 OPEN, 등록·수정 요청으로는 바꿀 수 없음 (상태 변경 API에서만 변경)
+    @Column(name = "op_status")
+    @Builder.Default
+    private String opStatus = "OPEN";
+
+    // 담당 매니저 (popup_store.manager_id -> member.member_id FK, 없으면 null)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id")
+    private User manager;
 
     // Request -> Entity 변환시 사용
     // 등록할 때만 사용 : popId = null (시퀀스가 번호 생성) / 수정은 아래 update() 사용
@@ -75,7 +87,6 @@ public class PopupStore {
             .reservStart(request.getReservStart())
             .reservEnd(request.getReservEnd())
             .reservPeopleCap(request.getReservPeopleCap())
-            .walkinStatus(request.getWalkinStatus() != null ? request.getWalkinStatus() : "OPEN")
             .build();
     }
 
@@ -94,13 +105,6 @@ public class PopupStore {
         if (request.getCategory() != null) { // 비우면 기존 값 유지
             this.category = request.getCategory();
         }
-        if (request.getWalkinStatus() != null) { // 비우면 기존 값 유지
-            this.walkinStatus = request.getWalkinStatus();
-        }
     }
 
-    // 웨이팅 상태 변경 : OPEN(접수 중) / PAUSED(일시 중지) / CLOSED(마감)
-    public void changeWalkinStatus(String walkinStatus) {
-        this.walkinStatus = walkinStatus;
-    }
 }

@@ -53,7 +53,6 @@ public class PopupStoreService {
         checkRequired(request);
         checkPeriod(request);
         checkReservTime(request);
-        checkWalkinStatus(request.getWalkinStatus());
         checkNumbers(request); // 예약 정원, 오픈 차수 확인
         PopupStore saved = popupRepo.save(PopupStore.toEntity(null, request)); // popId가 null이면 insert
         return PopupStoreResponse.toDto(saved);
@@ -67,21 +66,10 @@ public class PopupStoreService {
         checkRequired(request);
         checkPeriod(request);
         checkReservTime(request);
-        checkWalkinStatus(request.getWalkinStatus());
         checkNumbers(request); // 예약 정원, 오픈 차수 확인
         checkPeriodChange(popup, request); // 기간이 바뀌면 회차, 상품과 충돌하는지 확인
         checkReservTimeChange(popup, request); // 예약 시간이 바뀌면 회차와 충돌하는지 확인
         popup.update(request);
-        return PopupStoreResponse.toDto(popup);
-    }
-
-    // 웨이팅 상태 변경 : 변경된 팝업 정보 반환
-    @Transactional
-    public PopupStoreResponse changeWalkinStatus(Long popId, String walkinStatus) {
-        PopupStore popup = popupRepo.findById(popId)
-                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
-        checkWalkinStatus(walkinStatus);
-        popup.changeWalkinStatus(walkinStatus);
         return PopupStoreResponse.toDto(popup);
     }
 
@@ -123,14 +111,6 @@ public class PopupStoreService {
                 || request.getStartDate() == null || request.getEndDate() == null
                 || request.getReservStart() == null || request.getReservEnd() == null) {
             throw new PopupException(PopupErrorCode.POPUP_REQUIRED_FIELD);
-        }
-    }
-
-    // 웨이팅 상태 체크 : OPEN / PAUSED / CLOSED 만 가능 (비우면 등록은 OPEN, 수정은 기존 값 유지)
-    private void checkWalkinStatus(String walkinStatus) {
-        if (walkinStatus != null && !walkinStatus.equals("OPEN")
-                && !walkinStatus.equals("PAUSED") && !walkinStatus.equals("CLOSED")) {
-            throw new PopupException(PopupErrorCode.INVALID_WALKIN_STATUS);
         }
     }
 
