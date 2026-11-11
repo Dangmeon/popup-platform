@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class OrderResponse {
 
     private Long orderId;
+    private String tossOrderId;
     private int totalPrice;
     private OrderStatus orderStatus;
     private LocalDateTime orderedAt;
@@ -22,6 +23,7 @@ public class OrderResponse {
         OrderResponse response = new OrderResponse();
 
         response.orderId = order.getOrderId();
+        response.tossOrderId = order.getTossOrderId();
         response.totalPrice = order.getTotalPrice();
         response.orderStatus = order.getOrderStatus();
         response.orderedAt = order.getOrderedAt();
