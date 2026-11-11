@@ -1,6 +1,5 @@
-package com.popq.platform.config;
+package com.popq.platform.redis;
 
-import com.popq.platform.reservation.redis.ReservationExpirationRedisListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -13,7 +12,7 @@ public class RedisConfig {
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(
             RedisConnectionFactory connectionFactory,
-            ReservationExpirationRedisListener listener
+            RedisExpirationListener listener
     ) {
 
         RedisMessageListenerContainer container =
