@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Getter
@@ -18,6 +19,9 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ORDER_ID")
     private Long orderId;
+
+    @Column(name = "TOSS_ORDER_ID", unique = true, length = 20)
+    private String tossOrderId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MEMBER_ID", nullable = false)
@@ -72,6 +76,10 @@ public class Order {
         order.orderStatus = OrderStatus.PENDING;
         order.orderedAt = LocalDateTime.now();
         order.expiresAt = expiresAt;
+
+        order.tossOrderId = UUID.randomUUID()
+                .toString()
+                .replace("-", "");
 
         return order;
     }

@@ -5,6 +5,10 @@ import com.popq.platform.dto.OrderDetailResponse;
 import com.popq.platform.dto.OrderItemRequest;
 import com.popq.platform.dto.OrderResponse;
 import com.popq.platform.entity.*;
+import com.popq.platform.exception.OrderErrorCode;
+import com.popq.platform.exception.OrderException;
+import com.popq.platform.exception.ProductErrorCode;
+import com.popq.platform.exception.ProductException;
 import com.popq.platform.redis.RedisExpirationKeyService;
 import com.popq.platform.repository.OrderItemRepository;
 import com.popq.platform.repository.OrderRepository;
@@ -50,28 +54,30 @@ public class OrderService {
         for (OrderItemRequest item : request.getItems()) {
             // 수량 검증
             if (item.getQuantity() == null || item.getQuantity() <= 0) {
-                throw new IllegalArgumentException("상품은 한 개 이상이어야 합니다.");
+                throw new OrderException(OrderErrorCode.INVALID_QUANTITY);
             }
 
             Product product = productRepository.findById(item.getProductId())
-                    .orElseThrow(() -> new IllegalArgumentException("상품이 없습니다."));
+                    .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
 
             productMap.put(item.getProductId(), product);
 
             // 판매 기간 검증
-            if(product.getSaleStart() != null && now.isBefore(product.getSaleStart())) {
-                throw new IllegalArgumentException("아직 판매 시작 전인 상품입니다.");
+            if (product.getSaleStart() != null && now.isBefore(product.getSaleStart())) {
+                throw new OrderException(OrderErrorCode.SALE_NOT_STARTED);
             }
-            if(product.getSaleEnd() != null && now.isAfter(product.getSaleEnd())) {
-                throw new IllegalArgumentException("판매가 종료된 상품입니다.");
+
+            if (product.getSaleEnd() != null && now.isAfter(product.getSaleEnd())) {
+                throw new OrderException(OrderErrorCode.SALE_ENDED);
             }
 
             // 1인 구매 제한 검증
             int purchaseQuantity = orderItemRepository.sumPurchasedQuantity(
                     user.getId(), item.getProductId(), List.of(OrderStatus.PENDING, OrderStatus.PAID));
 
-            if(purchaseQuantity + item.getQuantity() > product.getMaxQty()){
-                throw new IllegalArgumentException(
+            if (purchaseQuantity + item.getQuantity() > product.getMaxQty()) {
+                throw new OrderException(
+                        OrderErrorCode.PURCHASE_LIMIT_EXCEEDED,
                         "해당 상품은 1인당 최대 " + product.getMaxQty() + "개까지 구매할 수 있습니다.");
             }
 
@@ -81,7 +87,7 @@ public class OrderService {
             );
 
             if (updatedRows == 0) {
-                throw new IllegalArgumentException("재고가 부족합니다.");
+                throw new OrderException(OrderErrorCode.INSUFFICIENT_STOCK);
             }
 
             // 총 주문 금액
@@ -148,11 +154,11 @@ public class OrderService {
     public OrderDetailResponse getOrderDetail(String username, Long orderId) {
         // 주문 존재 여부 확인
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("주문한 내역이 없습니다."));
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
         // 본인 주문 여부 확인
-        if(!order.getUser().getUsername().equals(username)) {
-            throw new IllegalArgumentException("본인의 주문만 조회할 수 있습니다.");
+        if (!order.getUser().getUsername().equals(username)) {
+            throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
         }
 
         // 주문 상품 조회 및 DTO 변환
@@ -164,19 +170,20 @@ public class OrderService {
     public OrderResponse cancelOrder(String username, Long orderId) {
         // 주문 락 조회
         Order order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("주문이 없습니다."));
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
         // 본인 주문 여부 확인
         if (!order.getUser().getUsername().equals(username)) {
-            throw new IllegalArgumentException("본인의 주문만 취소할 수 있습니다.");
+            throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
         }
 
         // 취소 가능한 주문 상태인지 확인
-        if(order.getOrderStatus() == OrderStatus.CANCELLED){
-            throw new IllegalArgumentException("이미 취소된 주문입니다.");
+        if (order.getOrderStatus() == OrderStatus.CANCELLED) {
+            throw new OrderException(OrderErrorCode.ORDER_ALREADY_CANCELLED);
         }
+
         if (order.getOrderStatus() == OrderStatus.EXPIRED) {
-            throw new IllegalArgumentException("이미 만료된 주문입니다.");
+            throw new OrderException(OrderErrorCode.ORDER_EXPIRED);
         }
 
         // PENDING 주문 취소 및 재고 복구
@@ -188,7 +195,7 @@ public class OrderService {
                             orderItem.getProduct().getPrdId(), orderItem.getQuantity());
 
                 if (updatedRows == 0) {
-                    throw new IllegalStateException("재고 복구 중 오류가 발생했습니다.");
+                    throw new OrderException(OrderErrorCode.STOCK_RESTORE_FAILED);
                 }
             }
 
@@ -208,6 +215,6 @@ public class OrderService {
             throw new IllegalStateException("결제 완료 주문은 결제 취소 연동이 필요합니다.");
         }
 
-        throw new IllegalArgumentException("취소할 수 없는 주문 상태입니다.");
+        throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
     }
 }

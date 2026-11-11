@@ -8,6 +8,6 @@ import lombok.NoArgsConstructor;
 public class PaymentRequest {
 
     private String paymentKey;
-    private String orderId;
+    private String OrderId;
     private int amount;
 }
