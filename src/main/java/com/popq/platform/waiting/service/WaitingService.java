@@ -1,12 +1,16 @@
-package com.popq.platform.service;
+package com.popq.platform.waiting.service;
 
-import com.popq.platform.dto.WaitingRegisterRequest;
-import com.popq.platform.dto.WaitingStatusResponse;
+import com.popq.platform.waiting.dto.AdminWaitingListResponse;
+import com.popq.platform.waiting.dto.CheckInRequest;
+import com.popq.platform.waiting.dto.WaitingRegisterRequest;
+import com.popq.platform.waiting.dto.WaitingStatusResponse;
 import com.popq.platform.entity.PopupStore;
-import com.popq.platform.entity.WaitingQueue;
-import com.popq.platform.entity.WaitingStatus;
+import com.popq.platform.waiting.entity.WaitingQueue;
+import com.popq.platform.waiting.entity.WaitingStatus;
 import com.popq.platform.repository.PopupStoreRepository;
-import com.popq.platform.repository.WaitingQueueRepository;
+import com.popq.platform.waiting.exception.WaitingErrorCode;
+import com.popq.platform.waiting.exception.WaitingException;
+import com.popq.platform.waiting.repository.WaitingQueueRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -229,6 +233,62 @@ public class WaitingService {
         }
 
         log.info("[스케줄러] 총 {}건의 대기가 입장 시간 초과로 EXPIRED 처리되었습니다.", expiredList.size());
+    }
+
+    @Transactional
+    public WaitingStatusResponse checkIn(CheckInRequest request) {
+        // checkInCode에서 waitingId ("CHK-0005-0010" 일 경우 10) 파싱
+        Long waitingId = parseWaitingIdFromCheckInCode(request.getCheckInCode());
+        // 만든 enterWaiting만 그대로 호출
+        return enterWaiting(waitingId);
+    }
+
+    private Long parseWaitingIdFromCheckInCode(String checkInCode) { // 체크인 코드에서 waitingId 추출하는 메소드
+        try {
+            String[] parts = checkInCode.split("-");
+            if (parts.length != 3 || !parts[0].equals("CHK")) {
+                throw new WaitingException(WaitingErrorCode.WAITING_NOT_FOUND);
+            }
+            return Long.parseLong(parts[2]);
+        } catch (Exception e) {
+            throw new WaitingException(WaitingErrorCode.WAITING_NOT_FOUND);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public AdminWaitingListResponse getAdminWaitingList(Long popId, WaitingStatus status) {
+        if (!popupStoreRepository.existsById(popId)) { // 팝업이 있는지?
+            throw new WaitingException(WaitingErrorCode.POPUP_NOT_FOUND);
+        }
+
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+
+        // 상태 필터링 조건 설정 (null이면 전체 조회)
+        List<WaitingStatus> filterStatuses = (status != null) ? List.of(status) : null;
+
+        // 당일 대기 목록 조회
+        List<WaitingQueue> queues = waitingQueueRepository.findAdminWaitingsByPopup(
+                popId,
+                filterStatuses,
+                startOfToday
+        );
+
+        // 통계 카운트 집계
+        int waitingCount = 0; // 대기 인원 카운팅
+        int calledCount = 0; // 호출된 인원 카운팅
+        for (WaitingQueue w : queues) {
+            if (w.getWaitingStatus() == WaitingStatus.WAITING) {
+                waitingCount++;
+            } else if (w.getWaitingStatus() == WaitingStatus.CALLED) {
+                calledCount++;
+            }
+        }
+
+        List<WaitingStatusResponse> responses = queues.stream()
+                .map(q -> WaitingStatusResponse.of(q, null, null))
+                .toList();
+
+        return AdminWaitingListResponse.of(popId, waitingCount, calledCount, responses);
     }
 
     // 웹소켓 전달 메소드
