@@ -1,8 +1,8 @@
-package com.popq.platform.controller;
+package com.popq.platform.waiting.controller;
 
-import com.popq.platform.dto.WaitingRegisterRequest;
-import com.popq.platform.dto.WaitingStatusResponse;
-import com.popq.platform.service.WaitingService;
+import com.popq.platform.waiting.dto.WaitingRegisterRequest;
+import com.popq.platform.waiting.dto.WaitingStatusResponse;
+import com.popq.platform.waiting.service.WaitingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
