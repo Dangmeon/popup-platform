@@ -56,10 +56,6 @@ public class PopupStore {
     @Column(name = "reserv_people_cap")
     private Integer reservPeopleCap;
 
-    @Column(name = "walkin_status")
-    @Builder.Default
-    private String walkinStatus = "OPEN";
-
     // 운영 상태 : OPEN 정상 운영 / PAUSED 일시 중단 / CANCELLED 종료(복구 불가)
     // 등록 시 항상 OPEN, 등록·수정 요청으로는 바꿀 수 없음 (상태 변경 API에서만 변경)
     @Column(name = "op_status")
