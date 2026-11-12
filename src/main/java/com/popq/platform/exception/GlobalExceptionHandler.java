@@ -1,6 +1,8 @@
 package com.popq.platform.exception;
 
 import com.popq.platform.reservation.exception.ReservationException;
+import com.popq.platform.waiting.exception.WaitingErrorCode;
+import com.popq.platform.waiting.exception.WaitingException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -88,5 +90,21 @@ public class GlobalExceptionHandler {
         error.put("message", ex.getErrorCode().getMessage());
 
         return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 대기 관련 예외 처리
+    @ExceptionHandler(WaitingException.class)
+    public ResponseEntity<ErrorResponse> handleWaitingException(WaitingException e) {
+        WaitingErrorCode errorCode = e.getErrorCode();
+
+        ErrorResponse response = new ErrorResponse(
+                errorCode.name(),          // 에러 코드 문자열 (예: "ALREADY_CALLED")
+                errorCode.getMessage(),   // 에러 메시지 (예: "이미 호출된 대기입니다.")
+                null                      // 유효성 검증 필드 에러가 아니므로 null
+        );
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(response);
     }
 }
