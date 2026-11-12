@@ -16,4 +16,9 @@ public class PasswordFindRequest {
     @Email(message = "올바른 이메일 형식이어야 합니다.")
     @Pattern(regexp = "^[A-Za-z0-9._%+-]+@gmail\\.com$", message = "구글 이메일(@gmail.com)만 입력 가능합니다.")
     private String email;
+
+    private String name;
+
+    private String code;
+    private String newPassword;
 }
