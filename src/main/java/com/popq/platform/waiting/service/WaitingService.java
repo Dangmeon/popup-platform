@@ -8,11 +8,14 @@ import com.popq.platform.entity.PopupStore;
 import com.popq.platform.waiting.entity.WaitingQueue;
 import com.popq.platform.waiting.entity.WaitingStatus;
 import com.popq.platform.repository.PopupStoreRepository;
+import com.popq.platform.waiting.event.WaitingCalledEvent;
+import com.popq.platform.waiting.event.WaitingRegisteredEvent;
 import com.popq.platform.waiting.exception.WaitingErrorCode;
 import com.popq.platform.waiting.exception.WaitingException;
 import com.popq.platform.waiting.repository.WaitingQueueRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +34,7 @@ public class WaitingService {
     private final WaitingQueueRepository waitingQueueRepository;
     private final PopupStoreRepository popupStoreRepository;
     private final SimpMessagingTemplate messagingTemplate; // Spring이 제공하는 STOMP 메시지 발송 도구(WebSocket 메시지 전송용) 생성
+    private final ApplicationEventPublisher eventPublisher;
 
     // 현장 대기열 등록
 
@@ -97,6 +101,14 @@ public class WaitingService {
                 response,
                 "대기 등록"
         );
+
+        eventPublisher.publishEvent(new WaitingRegisteredEvent(
+                savedWaiting.getWaitingId(),
+                savedWaiting.getPhone(),
+                popup.getTitle(),
+                savedWaiting.getQueueNumber(),
+                (int) teamsAhead
+        ));
         // 반환
         return response;
     }
@@ -177,6 +189,14 @@ public class WaitingService {
                 response,
                 "대기자 호출"
         );
+
+        eventPublisher.publishEvent(new WaitingCalledEvent(
+                waiting.getWaitingId(),
+                waiting.getPhone(),
+                waiting.getPopupStore().getTitle(),
+                waiting.getQueueNumber(),
+                response.getCheckInCode()
+        ));
 
         return response;
     }
