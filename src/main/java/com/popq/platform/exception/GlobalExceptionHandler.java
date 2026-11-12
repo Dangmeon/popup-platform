@@ -131,5 +131,3 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 }
-    }
-}
