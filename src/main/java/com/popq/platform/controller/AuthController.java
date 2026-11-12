@@ -3,7 +3,7 @@ package com.popq.platform.controller;
 import com.popq.platform.dto.LoginRequest;
 import com.popq.platform.dto.PasswordFindRequest;
 import com.popq.platform.dto.SignupRequest;
-import com.popq.platform.service.UserService;
+import com.popq.platform.service.AuthService; // 👈 AuthService 임포트 확인
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,23 +14,23 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final UserService userService;
+    private final AuthService authService; // 변수명을 소문자 authService로 선언
 
     @PostMapping("/signup")
     public ResponseEntity<String> signup(@RequestBody @Valid SignupRequest requestDto) {
-        userService.signup(requestDto);
+        authService.signup(requestDto);
         return ResponseEntity.ok("회원가입이 완료되었습니다.");
     }
 
     @PostMapping("/login")
     public ResponseEntity<String> login(@RequestBody @Valid LoginRequest requestDto) {
-        String token = userService.login(requestDto);
+        String token = authService.login(requestDto);
         return ResponseEntity.ok(token);
     }
 
     @PutMapping("/password/reset")
     public ResponseEntity<String> findPassword(@RequestBody @Valid PasswordFindRequest requestDto) {
-        userService.findPassword(requestDto);
+        authService.findPassword(requestDto); // 👈 findAndSendTempPassword 를 findPassword로 변경
         return ResponseEntity.ok("임시 비밀번호가 이메일로 발송되었습니다.");
     }
 
