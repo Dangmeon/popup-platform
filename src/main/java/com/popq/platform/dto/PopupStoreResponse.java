@@ -23,7 +23,8 @@ public class PopupStoreResponse {
     private String reservStart;
     private String reservEnd;
     private Integer reservPeopleCap;
-    private String walkinStatus;
+    private String opStatus;  // (OPEN / PAUSED / CANCELLED)
+    private Long managerId;   // 담당 매니저 회원 번호 (없으면 null)
     private String status; // UPCOMING 오픈 예정 / ONGOING 진행중 / ENDED 종료 (계산값)
 
     // [회원 연동] 로그인 회원의 찜 여부
@@ -43,7 +44,8 @@ public class PopupStoreResponse {
                 .reservStart(entity.getReservStart())
                 .reservEnd(entity.getReservEnd())
                 .reservPeopleCap(entity.getReservPeopleCap())
-                .walkinStatus(entity.getWalkinStatus())
+                .opStatus(entity.getOpStatus())
+                .managerId(entity.getManager() != null ? entity.getManager().getId() : null)
                 .status(getStatus(entity))
                 .build();
     }
