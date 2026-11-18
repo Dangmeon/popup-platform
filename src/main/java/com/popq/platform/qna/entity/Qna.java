@@ -58,12 +58,24 @@ public class Qna {
     private LocalDateTime answeredAt;
 
     @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+//    @PrePersist
+//    public void prePersist() {
+//        LocalDateTime now = LocalDateTime.now();
+//        this.createdAt = now;
+//        this.updatedAt = now;
+//    }
+//
+//    @PreUpdate
+//    public void preUpdate() {
+//        this.updatedAt = LocalDateTime.now();
+//    }
 
     @Builder
     public Qna(User writer, QnaCategory category, String title, String content, boolean isSecret) {
