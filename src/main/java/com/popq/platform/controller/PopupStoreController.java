@@ -1,5 +1,7 @@
 package com.popq.platform.controller;
 
+import com.popq.platform.dto.ManagerResponse;
+import com.popq.platform.dto.PopupManagerRequest;
 import com.popq.platform.dto.PopupStoreRequest;
 import com.popq.platform.dto.PopupStoreResponse;
 import com.popq.platform.service.PopupStoreService;
@@ -79,5 +81,18 @@ public class PopupStoreController {
     @DeleteMapping("/api/admin/popups/{popId}")
     public void deletePopup(@PathVariable("popId") Long popId, @AuthenticationPrincipal String username) {
         service.deletePopup(popId, username);
+    }
+
+    // 매니저 목록 (ADMIN 전용) : 배정 드롭다운에 띄울 MANAGER 회원 [{id, name, email}]
+    @GetMapping("/api/admin/managers")
+    public List<ManagerResponse> listManagers(@AuthenticationPrincipal String username) {
+        return service.listManagers(username);
+    }
+
+    // 담당 매니저 배정 (ADMIN 전용) : {"managerEmail": "..."} / 빈 값이면 배정 해제
+    @PatchMapping("/api/admin/popups/{popId}/manager")
+    public PopupStoreResponse assignManager(@PathVariable("popId") Long popId, @RequestBody PopupManagerRequest request,
+                                            @AuthenticationPrincipal String username) {
+        return service.assignManager(popId, request, username);
     }
 }

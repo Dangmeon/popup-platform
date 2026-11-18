@@ -1,5 +1,6 @@
 package com.popq.platform.service;
 
+import com.popq.platform.dto.ManagerResponse;
 import com.popq.platform.entity.PopupStore;
 import com.popq.platform.entity.Role;
 import com.popq.platform.entity.User;
@@ -10,6 +11,9 @@ import com.popq.platform.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
 
 // 관리자 API 공통 권한 검사
 // ADMIN : 모든 팝업 관리 가능 / MANAGER : 본인이 담당(manager_id)인 팝업만 관리 가능
@@ -53,6 +57,33 @@ public class PopupAccessService {
             return;
         }
         throw new PopupException(PopupErrorCode.POPUP_ACCESS_DENIED);
+    }
+
+    // ADMIN 전용 기능 확인 (담당 매니저 배정 등) : ADMIN이 아니면 403
+    public void checkAdmin(String username) {
+        if (getLoginUser(username).getRole() != Role.ADMIN) {
+            throw new PopupException(PopupErrorCode.ADMIN_ONLY);
+        }
+    }
+
+    // 담당자로 지정할 매니저 조회 : 없는 이메일 404, MANAGER가 아니면 400
+    public User getManagerByEmail(String email) {
+        User manager = userRepo.findByUsername(email.trim())
+                .orElseThrow(() -> new PopupException(PopupErrorCode.MANAGER_NOT_FOUND));
+        if (manager.getRole() != Role.MANAGER) {
+            throw new PopupException(PopupErrorCode.NOT_MANAGER_ROLE);
+        }
+        return manager;
+    }
+
+    // 매니저 목록 (ADMIN 전용, 배정 드롭다운용) : 활동 중인 MANAGER 회원만, 이름순
+    public List<ManagerResponse> listManagers(String username) {
+        checkAdmin(username); // ADMIN이 아니면 403
+        List<ManagerResponse> dtoList = new ArrayList<ManagerResponse>();
+        for (User u : userRepo.findByRoleAndStatus(Role.MANAGER, User.UserStatus.ACTIVE)) {
+            dtoList.add(ManagerResponse.toDto(u));
+        }
+        return dtoList;
     }
 
     // 관리자 팝업 목록에서 사용 : MANAGER면 본인 id, ADMIN이면 null(전체)

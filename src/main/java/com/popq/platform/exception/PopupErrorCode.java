@@ -18,7 +18,10 @@ public enum PopupErrorCode {
     POPUP_TIMESLOT_OUT_OF_RESERV_TIME(HttpStatus.CONFLICT, "변경할 예약 시간 밖에 회차가 있습니다. 해당 회차를 먼저 삭제하거나 수정해주세요."),
     INVALID_RESERV_PEOPLE_CAP(HttpStatus.BAD_REQUEST, "예약 정원은 1명 이상이어야 합니다."),
     INVALID_ROUND_NUM(HttpStatus.BAD_REQUEST, "팝업 오픈 차수는 1 이상이어야 합니다."),
-    POPUP_ACCESS_DENIED(HttpStatus.FORBIDDEN, "담당 팝업만 관리할 수 있습니다.");
+    POPUP_ACCESS_DENIED(HttpStatus.FORBIDDEN, "담당 팝업만 관리할 수 있습니다."),
+    ADMIN_ONLY(HttpStatus.FORBIDDEN, "관리자만 사용할 수 있는 기능입니다."),
+    MANAGER_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 이메일의 회원을 찾을 수 없습니다."),
+    NOT_MANAGER_ROLE(HttpStatus.BAD_REQUEST, "팝업 매니저(MANAGER) 회원만 담당자로 지정할 수 있습니다.");
 
     private final HttpStatus status;
     private final String message;

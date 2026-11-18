@@ -1,5 +1,7 @@
 package com.popq.platform.service;
 
+import com.popq.platform.dto.ManagerResponse;
+import com.popq.platform.dto.PopupManagerRequest;
 import com.popq.platform.dto.PopupStoreRequest;
 import com.popq.platform.dto.PopupStoreResponse;
 import com.popq.platform.entity.PopupStore;
@@ -115,6 +117,26 @@ public class PopupStoreService {
         PopupStore entity = popupRepo.findById(popId)
                 .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
         return PopupStoreResponse.toDto(entity);
+    }
+
+    // 매니저 목록 (ADMIN 전용) : 배정 드롭다운용
+    public List<ManagerResponse> listManagers(String username) {
+        return accessService.listManagers(username);
+    }
+
+    // 담당 매니저 배정 (ADMIN 전용) : managerEmail을 비우면 배정 해제 / 바뀐 팝업 정보 반환
+    @Transactional
+    public PopupStoreResponse assignManager(Long popId, PopupManagerRequest request, String username) {
+        accessService.checkAdmin(username); // ADMIN이 아니면 403
+        PopupStore popup = popupRepo.findById(popId)
+                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
+        String email = request.getManagerEmail();
+        if (email == null || email.isBlank()) {
+            popup.assignManager(null); // 배정 해제
+        } else {
+            popup.assignManager(accessService.getManagerByEmail(email)); // 없으면 404, MANAGER가 아니면 400
+        }
+        return PopupStoreResponse.toDto(popup);
     }
 
     // entity 목록 -> response 목록 변환
