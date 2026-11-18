@@ -103,4 +103,8 @@ public class PopupStore {
         }
     }
 
+    // 담당 매니저 지정 (MANAGER가 팝업을 등록하면 본인으로 지정)
+    public void assignManager(User manager) {
+        this.manager = manager;
+    }
 }

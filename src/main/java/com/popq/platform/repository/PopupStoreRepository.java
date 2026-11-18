@@ -20,6 +20,17 @@ public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
     @Query("SELECT p FROM PopupStore p WHERE p.category = :category ORDER BY p.startDate DESC")
     List<PopupStore> findByCategory(@Param("category") String category);
 
+    // 관리자 팝업 목록 : 값이 null인 조건은 건너뜀 (managerId null = 전체, keyword null = 검색 안 함, opStatus null = 전체 상태)
+    // keyword : LOCATE(찾을 글자, 컬럼) > 0 = 그 글자가 포함되어 있음 (Oracle에서는 INSTR로 바뀜)
+    @Query("SELECT p FROM PopupStore p LEFT JOIN p.manager m "
+            + "WHERE (:managerId IS NULL OR m.id = :managerId) "
+            + "AND (:keyword IS NULL OR LOCATE(:keyword, p.title) > 0 OR LOCATE(:keyword, p.location) > 0) "
+            + "AND (:opStatus IS NULL OR p.opStatus = :opStatus) "
+            + "ORDER BY p.startDate DESC")
+    List<PopupStore> findAdminList(@Param("managerId") Long managerId,
+                                   @Param("keyword") String keyword,
+                                   @Param("opStatus") String opStatus);
+
     // [웨이팅 연동] 비관적 락 조회 - 대기번호 중복 발급 방지
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM PopupStore p WHERE p.popId = :popId")
