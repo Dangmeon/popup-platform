@@ -1,6 +1,8 @@
 package com.popq.platform.exception;
 
 import com.popq.platform.reservation.exception.ReservationException;
+import com.popq.platform.waiting.exception.WaitingErrorCode;
+import com.popq.platform.waiting.exception.WaitingException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -121,4 +124,42 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
     }
 
+
+    // 이미지 에러 처리
+    @ExceptionHandler(ImageException.class)
+    public ResponseEntity<Map<String, String>> handleImageException(ImageException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 업로드 용량 초과 (spring.servlet.multipart.max-file-size 초과 시 스프링이 던짐)
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, String>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ImageErrorCode.IMAGE_TOO_LARGE.name());
+        error.put("message", ImageErrorCode.IMAGE_TOO_LARGE.getMessage());
+
+        return ResponseEntity.status(ImageErrorCode.IMAGE_TOO_LARGE.getStatus()).body(error);
+    }
+
+    // 대기 관련 예외 처리
+    @ExceptionHandler(WaitingException.class)
+    public ResponseEntity<ErrorResponse> handleWaitingException(WaitingException e) {
+        WaitingErrorCode errorCode = e.getErrorCode();
+
+        ErrorResponse response = new ErrorResponse(
+                errorCode.name(),          // 에러 코드 문자열 (예: "ALREADY_CALLED")
+                errorCode.getMessage(),   // 에러 메시지 (예: "이미 호출된 대기입니다.")
+                null                      // 유효성 검증 필드 에러가 아니므로 null
+        );
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(response);
+    }
 }

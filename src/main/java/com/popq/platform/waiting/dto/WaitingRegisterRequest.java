@@ -1,4 +1,4 @@
-package com.popq.platform.dto;
+package com.popq.platform.waiting.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;

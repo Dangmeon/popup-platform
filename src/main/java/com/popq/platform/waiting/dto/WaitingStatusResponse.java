@@ -1,7 +1,7 @@
-package com.popq.platform.dto;
+package com.popq.platform.waiting.dto;
 
-import com.popq.platform.entity.WaitingQueue;
-import com.popq.platform.entity.WaitingStatus;
+import com.popq.platform.waiting.entity.WaitingQueue;
+import com.popq.platform.waiting.entity.WaitingStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

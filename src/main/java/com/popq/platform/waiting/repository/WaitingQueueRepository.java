@@ -1,7 +1,7 @@
-package com.popq.platform.repository;
+package com.popq.platform.waiting.repository;
 
-import com.popq.platform.entity.WaitingQueue;
-import com.popq.platform.entity.WaitingStatus;
+import com.popq.platform.waiting.entity.WaitingQueue;
+import com.popq.platform.waiting.entity.WaitingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -59,13 +59,14 @@ public interface WaitingQueueRepository extends JpaRepository<WaitingQueue, Long
     // 가독성을 위한 jpql 처리
     @Query("SELECT w FROM WaitingQueue w " +
             "WHERE w.popupStore.popId = :popId " +
-            "  AND w.waitingStatus IN :statuses " +
+            "  AND (:statuses IS NULL OR w.waitingStatus IN :statuses) " +
+            "  AND w.joinedAt >= :startOfToday " +
             "ORDER BY w.queueNumber ASC")
-    List<WaitingQueue> findActiveWaitingsByPopup(
+    List<WaitingQueue> findAdminWaitingsByPopup(
             @Param("popId") Long popId,
-            @Param("statuses") Collection<WaitingStatus> statuses
+            @Param("statuses") Collection<WaitingStatus> statuses,
+            @Param("startOfToday") LocalDateTime startOfToday
     );
-
     // 1분마다 체크하여 만료되었는지 아닌지 확인하는 용도
     // 예)
     // 만약 현재 시간이 14:06분이고 CALLED 상태의 고객의 입장 호출 시각이 13:55일때 만료기한(expired_at)이 10분일 경우 14:05분에 만료가 되어

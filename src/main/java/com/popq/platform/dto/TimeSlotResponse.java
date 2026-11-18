@@ -20,6 +20,7 @@ public class TimeSlotResponse {
     private String endTime;
     private Integer capacity;
     private Integer reservedCount;
+    private String slotStatus; // OPEN / CANCELLED
     private Integer remaining; // 남은 자리 = 정원 - 예약 인원 (화면 표시용)
     private LocalDateTime reservOpenAt;  // 예약 오픈 일시 (계산값)
     private LocalDateTime reservCloseAt; // 예약 마감 일시 (계산값, 이 시각부터 예약 불가)
@@ -47,6 +48,7 @@ public class TimeSlotResponse {
                 .endTime(entity.getEndTime())
                 .capacity(entity.getCapacity())
                 .reservedCount(entity.getReservedCount())
+                .slotStatus(entity.getSlotStatus())
                 .remaining(remaining)
                 .reservOpenAt(reservOpenAt)
                 .reservCloseAt(reservCloseAt)
