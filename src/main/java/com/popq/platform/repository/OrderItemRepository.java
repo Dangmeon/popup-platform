@@ -28,12 +28,12 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     FROM OrderItem oi
     JOIN oi.order o
     WHERE o.user.id = :memberId
-      AND oi.product.prdId = :productId
+      AND oi.product.prdId = :prdId
       AND o.orderStatus IN :statuses
 """)
     int sumPurchasedQuantity(
             @Param("memberId") Long memberId,
-            @Param("productId") Long productId,
+            @Param("prdId") Long prdId,
             @Param("statuses") List<OrderStatus> statuses
     );
 }

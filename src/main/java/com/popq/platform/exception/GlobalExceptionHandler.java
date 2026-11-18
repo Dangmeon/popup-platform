@@ -98,7 +98,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handlePaymentException(PaymentException ex) {
         Map<String, String> error = new HashMap<>();
 
-        error.put("code", ex.getCode());
+        error.put("code", ex.getErrorCode().name());
         error.put("message", ex.getMessage());
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);

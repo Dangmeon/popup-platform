@@ -16,7 +16,15 @@ import java.util.UUID;
 public class Order {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(
+            strategy = GenerationType.SEQUENCE,
+            generator = "orders_seq_gen"
+    )
+    @SequenceGenerator(
+            name = "orders_seq_gen",
+            sequenceName = "orders_seq",
+            allocationSize = 1
+    )
     @Column(name = "ORDER_ID")
     private Long orderId;
 

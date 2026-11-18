@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 public class OrderItemResponse {
 
     private Long orderItemId;
-    private Long productId;
+    private Long prdId;
     private  String productName;
     private Integer quantity;
     private int price;
@@ -17,7 +17,9 @@ public class OrderItemResponse {
     public static OrderItemResponse from(OrderItem orderItem) {
         OrderItemResponse response = new OrderItemResponse();
 
-        response.productId = orderItem.getProduct().getPrdId();
+        response.orderItemId = orderItem.getOrderItemId();
+        response.prdId = orderItem.getProduct().getPrdId();
+        response.productName = orderItem.getProduct().getProductName();
         response.quantity = orderItem.getQuantity();
         response.price = orderItem.getPrice();
 

@@ -35,6 +35,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final RedisExpirationKeyService redisExpirationKeyService;
+    private final PaymentService paymentService;
 
     // 주문 생성
     @Transactional
@@ -57,10 +58,10 @@ public class OrderService {
                 throw new OrderException(OrderErrorCode.INVALID_QUANTITY);
             }
 
-            Product product = productRepository.findById(item.getProductId())
+            Product product = productRepository.findById(item.getPrdId())
                     .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
 
-            productMap.put(item.getProductId(), product);
+            productMap.put(item.getPrdId(), product);
 
             // 판매 기간 검증
             if (product.getSaleStart() != null && now.isBefore(product.getSaleStart())) {
@@ -73,7 +74,7 @@ public class OrderService {
 
             // 1인 구매 제한 검증
             int purchaseQuantity = orderItemRepository.sumPurchasedQuantity(
-                    user.getId(), item.getProductId(), List.of(OrderStatus.PENDING, OrderStatus.PAID));
+                    user.getId(), item.getPrdId(), List.of(OrderStatus.PENDING, OrderStatus.PAID));
 
             if (purchaseQuantity + item.getQuantity() > product.getMaxQty()) {
                 throw new OrderException(
@@ -83,7 +84,7 @@ public class OrderService {
 
             // 재고 차감
             int updatedRows = productRepository.decreaseStock(
-                    item.getProductId(), item.getQuantity()
+                    item.getPrdId(), item.getQuantity()
             );
 
             if (updatedRows == 0) {
@@ -107,7 +108,7 @@ public class OrderService {
         // 3. OrderItem 생성 + Order에 추가
         for (OrderItemRequest item : request.getItems()) {
 
-            Product product = productMap.get(item.getProductId());
+            Product product = productMap.get(item.getPrdId());
 
             int price = product.getPrice() * item.getQuantity();
 
@@ -190,8 +191,7 @@ public class OrderService {
         if(order.getOrderStatus() == OrderStatus.PENDING){
 
             for(OrderItem orderItem : order.getOrderItems()) {
-                int updatedRows =
-                        productRepository.increaseStock(
+                int updatedRows = productRepository.increaseStock(
                             orderItem.getProduct().getPrdId(), orderItem.getQuantity());
 
                 if (updatedRows == 0) {
@@ -212,7 +212,20 @@ public class OrderService {
         // PAID 주문은 PaymentService의 결제 취소 처리와 연계
         if(order.getOrderStatus() == OrderStatus.PAID){
 
-            throw new IllegalStateException("결제 완료 주문은 결제 취소 연동이 필요합니다.");
+            paymentService.cancelPayment(order);
+
+            for(OrderItem orderItem : order.getOrderItems()) {
+                int updatedRows = productRepository.increaseStock(
+                        orderItem.getProduct().getPrdId(), orderItem.getQuantity());
+
+                if (updatedRows == 0) {
+                    throw new OrderException(OrderErrorCode.STOCK_RESTORE_FAILED);
+                }
+            }
+
+            order.cancel();
+
+            return OrderResponse.from(order);
         }
 
         throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);

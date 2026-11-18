@@ -5,10 +5,10 @@ import lombok.Getter;
 @Getter
 public class PaymentException extends RuntimeException {
 
-    private final String code;
+    private final PaymentErrorCode errorCode;
 
-    public PaymentException(String code, String message) {
-        super(message);
-        this.code = code;
+    public PaymentException(PaymentErrorCode errorCode) {
+        super(errorCode.getMessage());
+        this.errorCode = errorCode;
     }
 }

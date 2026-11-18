@@ -6,6 +6,7 @@ import com.popq.platform.dto.TossErrorResponse;
 import com.popq.platform.entity.Order;
 import com.popq.platform.entity.OrderStatus;
 import com.popq.platform.entity.Payment;
+import com.popq.platform.exception.PaymentErrorCode;
 import com.popq.platform.exception.PaymentException;
 import com.popq.platform.redis.RedisExpirationKeyService;
 import com.popq.platform.repository.OrderRepository;
@@ -21,6 +22,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @Transactional(readOnly = true)
@@ -38,6 +42,10 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse confirmPayment(PaymentRequest request) {
+
+        System.out.println("paymentKey = " + request.getPaymentKey());
+        System.out.println("orderId = [" + request.getOrderId() + "]");
+        System.out.println("amount = " + request.getAmount());
 
         Order order = orderRepository.findByTossOrderIdForUpdate(request.getOrderId())
                 .orElseThrow(() -> new IllegalArgumentException("주문이 없다."));
@@ -69,6 +77,17 @@ public class PaymentService {
         return PaymentResponse.from(payment);
     }
 
+    @Transactional
+    public void cancelPayment(Order order) {
+
+        Payment payment = paymentRepository.findByOrder_OrderId(order.getOrderId())
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+        cancelTossPayment(payment.getPaymentKey());
+
+        payment.cancel();
+    }
+
     private void approveTossPayment(PaymentRequest request) {
 
         try {
@@ -84,41 +103,50 @@ public class PaymentService {
 
         } catch (HttpClientErrorException e) {
 
-            try {
-                TossErrorResponse tossError =
-                        objectMapper.readValue(
-                                e.getResponseBodyAsString(),
-                                TossErrorResponse.class
-                        );
-
-                throw new PaymentException(
-                        tossError.getCode(),
-                        tossError.getMessage()
-                );
-
-            } catch (JacksonException parsingException) {
-
-                throw new PaymentException(
-                        "TOSS_PAYMENT_FAILED",
-                        "결제 승인에 실패했습니다."
-                );
-            }
+            throw new PaymentException(PaymentErrorCode.TOSS_PAYMENT_FAILED);
 
         } catch (HttpServerErrorException e) {
 
-            throw new PaymentException(
-                    "TOSS_SERVER_ERROR",
-                    "토스페이먼츠 서버 오류가 발생했습니다."
-            );
+            throw new PaymentException(PaymentErrorCode.TOSS_SERVER_ERROR);
 
         } catch (RestClientException e) {
 
-            throw new PaymentException(
-                    "PAYMENT_CONNECTION_ERROR",
-                    "결제 서버와 통신 중 오류가 발생했습니다."
-            );
+            throw new PaymentException(PaymentErrorCode.PAYMENT_CONNECTION_ERROR);
         }
     }
 
-    // TODO TossPayments 연동 후 결제 취소 구현
+private void cancelTossPayment(String paymentKey) {
+
+    Map<String, String> body = Map.of(
+            "cancelReason", "고객 요청"
+    );
+
+    try {
+        restClient.post()
+                .uri(
+                        "https://api.tosspayments.com/v1/payments/{paymentKey}/cancel",
+                        paymentKey
+                )
+                .headers(headers ->
+                        headers.setBasicAuth(tossSecretKey, "")
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
+
+    } catch (HttpClientErrorException e) {
+
+        throw new PaymentException(PaymentErrorCode.TOSS_CANCEL_FAILED);
+
+    } catch (HttpServerErrorException e) {
+
+        throw new PaymentException(PaymentErrorCode.TOSS_SERVER_ERROR);
+
+    } catch (RestClientException e) {
+
+        throw new PaymentException(PaymentErrorCode.PAYMENT_CONNECTION_ERROR);
+    }
+}
+
 }
