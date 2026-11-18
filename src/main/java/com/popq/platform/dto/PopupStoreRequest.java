@@ -19,5 +19,4 @@ public class PopupStoreRequest {
     private String reservStart;
     private String reservEnd;
     private Integer reservPeopleCap;
-    private String walkinStatus;
 }

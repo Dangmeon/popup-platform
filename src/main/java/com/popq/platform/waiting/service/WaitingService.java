@@ -51,8 +51,8 @@ public class WaitingService {
         // 2. 사람이 많이 몰릴 때 트랜잭션 내부에 부가 작업이 조금이라도 길어지면 뒤쪽 요청들은 커넥션 풀을 고갈시키며 응답 지연이 발생.
         // 현재 임시로 사용하고 나중에 다른 대안이 필요 1. 별도의 순번 카운터 테이블 분리 / 2. 원자적 갱신 쿼리 / 3. Redis의 INCR 사용(대규모) 등등
 
-        // 팝업 운영 상태 검증 (walkin_status == 'OPEN'인지?)
-        if (!"OPEN".equalsIgnoreCase(popup.getWalkinStatus())) {
+        // 팝업 운영 상태 검증 (op_status == 'OPEN'인지?)
+        if (!"OPEN".equalsIgnoreCase(popup.getOpStatus())) {
             throw new IllegalStateException("현재 해당 팝업스토어는 현장 대기 접수가 마감되었거나 중단되었습니다.");
         }
 

@@ -52,6 +52,10 @@ public class TimeSlot {
     @Column(name = "reserved_count")
     private Integer reservedCount;
 
+    @Column(name = "slot_status")
+    @Builder.Default
+    private String slotStatus = "OPEN";
+
     // Request -> Entity 변환시 사용 (등록할 때만 사용 : timeSlotId = null, reservedCount = 0 / 수정은 아래 update() 사용)
     public static TimeSlot toEntity(Long timeSlotId, PopupStore popupStore, TimeSlotRequest request, Integer reservedCount) {
         return TimeSlot.builder()
