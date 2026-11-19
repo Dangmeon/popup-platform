@@ -1,4 +1,4 @@
-package com.popq.platform.entity;
+package com.popq.platform.reservation.entity;
 
 public enum ReservationStatus {
     HOLD,

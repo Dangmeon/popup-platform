@@ -66,6 +66,10 @@ public class OrderService {
             Product product = productRepository.findById(item.getPrdId())
                     .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
 
+            if(!"OPEN".equals(product.getPopupStore().getOpStatus())){
+                throw new OrderException(OrderErrorCode.POPUP_NOT_OPEN);
+            }
+
             productMap.put(item.getPrdId(), product);
 
             // 판매 기간 검증

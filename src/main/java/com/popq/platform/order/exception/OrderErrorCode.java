@@ -19,7 +19,8 @@ public enum OrderErrorCode {
     ORDER_EXPIRED(HttpStatus.CONFLICT, "이미 만료된 주문입니다."),
     STOCK_RESTORE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "재고 복구 중 오류가 발생했습니다."),
     PAID_ORDER_CANCEL_REQUIRED(HttpStatus.CONFLICT, "결제 완료 주문은 결제 취소 처리가 필요합니다."),
-    INVALID_ORDER_STATUS(HttpStatus.CONFLICT, "처리할 수 없는 주문 상태입니다.");
+    INVALID_ORDER_STATUS(HttpStatus.CONFLICT, "처리할 수 없는 주문 상태입니다."),
+    POPUP_NOT_OPEN(HttpStatus.CONFLICT, "현재 운영 중인 팝업스토어의 상품만 주문할 수 있습니다.");
 
     private final HttpStatus status;
     private final String message;

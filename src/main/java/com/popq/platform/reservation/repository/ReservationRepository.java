@@ -1,7 +1,7 @@
 package com.popq.platform.reservation.repository;
 
-import com.popq.platform.entity.Reservation;
-import com.popq.platform.entity.ReservationStatus;
+import com.popq.platform.reservation.entity.Reservation;
+import com.popq.platform.reservation.entity.ReservationStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -46,6 +46,17 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     """)
     Optional<Reservation> findByIdForUpdate(
             @Param("reservationId") Long reservationId
+    );
+
+    @Query("""
+        SELECT r
+        FROM Reservation r
+        WHERE r.timeSlot.timeSlotId = :timeSlotId
+            AND r.reservationStatus IN :statuses
+    """)
+    List<Reservation> findActiveReservationsByTimeSlot(
+            @Param("timeSlotId") Long timeSlotId,
+            @Param("statuses") List<ReservationStatus> statuses
     );
 
     // 해당 회차에 예약 이력이 하나라도 존재하는지 확인

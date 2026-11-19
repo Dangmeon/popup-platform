@@ -1,7 +1,7 @@
 package com.popq.platform.reservation.service;
 
-import com.popq.platform.entity.Reservation;
-import com.popq.platform.entity.ReservationStatus;
+import com.popq.platform.reservation.entity.Reservation;
+import com.popq.platform.reservation.entity.ReservationStatus;
 import com.popq.platform.reservation.redis.ReservationExpirationService;
 import com.popq.platform.reservation.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
