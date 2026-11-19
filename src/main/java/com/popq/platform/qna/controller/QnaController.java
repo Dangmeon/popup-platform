@@ -196,7 +196,7 @@ public class QnaController {
      }
      */
 
-    // 문의 삭제 (작성자 본인만)
+    // 문의 삭제 (작성자 본인)
     @DeleteMapping("/api/qnas/{qnaId}")
     public ResponseEntity<Void> deleteQna(
             @PathVariable Long qnaId,

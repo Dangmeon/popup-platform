@@ -1,6 +1,8 @@
 package com.popq.platform.qna.entity;
 
 import com.popq.platform.entity.User;
+import com.popq.platform.qna.exception.QnaErrorCode;
+import com.popq.platform.qna.exception.QnaException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -89,7 +91,7 @@ public class Qna {
 
     public void updateQuestion(QnaCategory category, String title, String content, boolean isSecret) {
         if (this.status == QnaStatus.ANSWERED) {
-            throw new IllegalStateException("답변이 완료된 문의는 수정할 수 없습니다.");
+            throw new QnaException(QnaErrorCode.ANSWERED_QNA_CANNOT_BE_MODIFIED);
         }
         if (category != null) {
             this.category = category;

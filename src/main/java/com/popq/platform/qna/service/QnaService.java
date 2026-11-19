@@ -8,6 +8,8 @@ import com.popq.platform.qna.dto.QnaResponse;
 import com.popq.platform.qna.entity.Qna;
 import com.popq.platform.qna.entity.QnaCategory;
 import com.popq.platform.qna.entity.QnaStatus;
+import com.popq.platform.qna.exception.QnaErrorCode;
+import com.popq.platform.qna.exception.QnaException;
 import com.popq.platform.qna.repository.QnaRepository;
 import com.popq.platform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +58,7 @@ public class QnaService {
         User currentUser = (email != null) ? userRepository.findByUsername(email).orElse(null) : null;
 
         if (qna.isSecret() && !canViewSecret(qna, currentUser)) {
-            throw new AccessDeniedException("비밀글은 작성자와 관리자만 열람할 수 있습니다.");
+            throw new QnaException(QnaErrorCode.FORBIDDEN_SECRET_QNA);
         }
 
         return QnaResponse.from(qna, true);
@@ -69,7 +71,7 @@ public class QnaService {
         Qna qna = getQna(qnaId);
 
         if (!qna.getWriter().getId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("본인이 작성한 문의만 수정할 수 있습니다.");
+            throw new QnaException(QnaErrorCode.FORBIDDEN_QNA_MODIFICATION);
         }
 
         qna.updateQuestion(request.getCategory(), request.getTitle(), request.getContent(), request.isSecret());
@@ -86,18 +88,17 @@ public class QnaService {
         boolean isAdmin = currentUser.getRole() == Role.ADMIN;
 
         if (!isWriter && !isAdmin) {
-            throw new AccessDeniedException("문의를 삭제할 권한이 없습니다.");
+            throw new QnaException(QnaErrorCode.FORBIDDEN_QNA_DELETION);
         }
-
         qnaRepository.delete(qna);
     }
 
-    // 6. [ADMIN] 답변 등록 및 수정
+    // [ADMIN] 답변 등록 및 수정
     @Transactional
     public QnaResponse answerQna(Long qnaId, String email, QnaAnswerRequest request) {
         User responder = getUserByEmail(email);
         if (responder.getRole() != Role.ADMIN) {
-            throw new AccessDeniedException("고객센터 답변은 최고 관리자(ADMIN)만 등록할 수 있습니다.");
+            throw new QnaException(QnaErrorCode.FORBIDDEN_ADMIN_ONLY);
         }
 
         Qna qna = getQna(qnaId);
@@ -115,14 +116,14 @@ public class QnaService {
 
     private User getUserByEmail(String email) {
         if (email == null) {
-            throw new AccessDeniedException("로그인이 필요한 서비스입니다.");
+            throw new QnaException(QnaErrorCode.UNAUTHORIZED_QNA_ACCESS);
         }
         return userRepository.findByUsername(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new QnaException(QnaErrorCode.UNAUTHORIZED_QNA_ACCESS));
     }
 
     private Qna getQna(Long qnaId) {
         return qnaRepository.findById(qnaId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 문의글입니다. ID: " + qnaId));
+                .orElseThrow(() -> new QnaException(QnaErrorCode.MEMBER_NOT_FOUND));
     }
 }
