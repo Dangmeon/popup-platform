@@ -1,5 +1,6 @@
 package com.popq.platform.exception;
 
+import com.popq.platform.order.exception.OrderException;
 import com.popq.platform.reservation.exception.ReservationException;
 import com.popq.platform.waiting.exception.WaitingErrorCode;
 import com.popq.platform.waiting.exception.WaitingException;
@@ -92,6 +93,38 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
     }
+
+    // 결제 에러 처리
+    @ExceptionHandler(PaymentException.class)
+    public ResponseEntity<Map<String, String>> handlePaymentException(PaymentException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalStateException(IllegalStateException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", "INVALID_STATE");
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(OrderException.class)
+    public ResponseEntity<Map<String, String>> handleOrderException(OrderException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
 
     // 이미지 에러 처리
     @ExceptionHandler(ImageException.class)

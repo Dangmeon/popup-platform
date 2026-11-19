@@ -1,15 +1,10 @@
 package com.popq.platform.dto;
 
-import com.popq.platform.entity.Role;
-import com.popq.platform.entity.User;
-import com.popq.platform.repository.UserRepository;
-import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Getter
 @NoArgsConstructor
@@ -39,4 +34,3 @@ public class SignupRequest {
     private String role;
 
 }
-

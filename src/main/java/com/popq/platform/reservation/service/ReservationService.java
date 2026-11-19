@@ -6,6 +6,7 @@ import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.popq.platform.dto.TimeSlotChangedEvent;
+import com.popq.platform.redis.RedisExpirationKeyService;
 import com.popq.platform.reservation.dto.ReservationCreateRequest;
 import com.popq.platform.reservation.dto.ReservationDetailResponse;
 import com.popq.platform.reservation.dto.ReservationResponse;
@@ -13,11 +14,11 @@ import com.popq.platform.reservation.dto.ReservationUpdateRequest;
 import com.popq.platform.entity.*;
 import com.popq.platform.reservation.exception.ReservationErrorCode;
 import com.popq.platform.reservation.exception.ReservationException;
+import com.popq.platform.reservation.redis.ReservationExpirationService;
 import com.popq.platform.reservation.repository.ReservationRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import com.popq.platform.repository.UserRepository;
 import com.popq.platform.reservation.event.ReservationHoldCreatedEvent;
-import com.popq.platform.reservation.redis.ReservationHoldRedisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,7 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final TimeSlotRepository timeSlotRepository;
     private final UserRepository userRepository;
-    private final ReservationHoldRedisService reservationHoldRedisService;
+    private final RedisExpirationKeyService redisExpirationKeyService;
     private final ReservationExpirationService reservationExpirationService;
     private final ApplicationEventPublisher eventPublisher; // Spring 안에서 이벤트를 발생시키는 역할
 
@@ -211,7 +212,7 @@ public class ReservationService {
 
         reservation.confirm(token);
 
-        reservationHoldRedisService.deleteHold(reservationId);
+        redisExpirationKeyService.delete("reservation:hold:" + reservationId);
 
         // 8. 결과 반환
         return ReservationResponse.fromReservation(reservation);
