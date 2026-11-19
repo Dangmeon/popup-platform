@@ -1,7 +1,7 @@
-package com.popq.platform.dto;
+package com.popq.platform.payment.dto;
 
-import com.popq.platform.entity.Payment;
-import com.popq.platform.entity.PaymentStatus;
+import com.popq.platform.payment.entity.Payment;
+import com.popq.platform.payment.entity.PaymentStatus;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 

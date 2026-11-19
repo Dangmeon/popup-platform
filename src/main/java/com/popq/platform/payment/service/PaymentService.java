@@ -1,16 +1,15 @@
-package com.popq.platform.service;
+package com.popq.platform.payment.service;
 
-import com.popq.platform.dto.PaymentRequest;
-import com.popq.platform.dto.PaymentResponse;
-import com.popq.platform.dto.TossErrorResponse;
-import com.popq.platform.entity.Order;
-import com.popq.platform.entity.OrderStatus;
-import com.popq.platform.entity.Payment;
+import com.popq.platform.payment.dto.PaymentRequest;
+import com.popq.platform.payment.dto.PaymentResponse;
+import com.popq.platform.order.entity.Order;
+import com.popq.platform.order.entity.OrderStatus;
+import com.popq.platform.payment.entity.Payment;
 import com.popq.platform.exception.PaymentErrorCode;
 import com.popq.platform.exception.PaymentException;
 import com.popq.platform.redis.RedisExpirationKeyService;
-import com.popq.platform.repository.OrderRepository;
-import com.popq.platform.repository.PaymentRepository;
+import com.popq.platform.order.repository.OrderRepository;
+import com.popq.platform.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -20,10 +19,8 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @Service

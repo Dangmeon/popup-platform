@@ -1,6 +1,6 @@
-package com.popq.platform.repository;
+package com.popq.platform.payment.repository;
 
-import com.popq.platform.entity.Payment;
+import com.popq.platform.payment.entity.Payment;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

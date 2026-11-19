@@ -1,5 +1,6 @@
 package com.popq.platform.exception;
 
+import com.popq.platform.order.exception.OrderException;
 import com.popq.platform.reservation.exception.ReservationException;
 import com.popq.platform.waiting.exception.WaitingErrorCode;
 import com.popq.platform.waiting.exception.WaitingException;

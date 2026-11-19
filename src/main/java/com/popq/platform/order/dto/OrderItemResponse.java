@@ -1,6 +1,6 @@
-package com.popq.platform.dto;
+package com.popq.platform.order.dto;
 
-import com.popq.platform.entity.OrderItem;
+import com.popq.platform.order.entity.OrderItem;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 

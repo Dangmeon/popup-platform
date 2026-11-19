@@ -1,4 +1,4 @@
-package com.popq.platform.dto;
+package com.popq.platform.order.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;

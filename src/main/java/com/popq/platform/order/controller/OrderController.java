@@ -1,13 +1,12 @@
-package com.popq.platform.controller;
+package com.popq.platform.order.controller;
 
-import com.popq.platform.dto.OrderCreateRequest;
-import com.popq.platform.dto.OrderDetailResponse;
-import com.popq.platform.dto.OrderResponse;
-import com.popq.platform.service.OrderService;
+import com.popq.platform.order.dto.OrderCreateRequest;
+import com.popq.platform.order.dto.OrderDetailResponse;
+import com.popq.platform.order.dto.OrderResponse;
+import com.popq.platform.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

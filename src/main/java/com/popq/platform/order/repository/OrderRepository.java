@@ -1,6 +1,6 @@
-package com.popq.platform.repository;
+package com.popq.platform.order.repository;
 
-import com.popq.platform.entity.Order;
+import com.popq.platform.order.entity.Order;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

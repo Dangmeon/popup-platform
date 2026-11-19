@@ -1,8 +1,8 @@
-package com.popq.platform.controller;
+package com.popq.platform.payment.controller;
 
-import com.popq.platform.dto.PaymentRequest;
-import com.popq.platform.dto.PaymentResponse;
-import com.popq.platform.service.PaymentService;
+import com.popq.platform.payment.dto.PaymentRequest;
+import com.popq.platform.payment.dto.PaymentResponse;
+import com.popq.platform.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;

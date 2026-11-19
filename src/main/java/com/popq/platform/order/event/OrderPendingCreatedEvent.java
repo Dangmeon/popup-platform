@@ -1,4 +1,4 @@
-package com.popq.platform.service;
+package com.popq.platform.order.event;
 
 public record OrderPendingCreatedEvent(
         Long orderId,

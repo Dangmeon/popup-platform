@@ -1,4 +1,4 @@
-package com.popq.platform.exception;
+package com.popq.platform.order.exception;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

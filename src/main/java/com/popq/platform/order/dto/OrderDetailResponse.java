@@ -1,34 +1,40 @@
-package com.popq.platform.dto;
+package com.popq.platform.order.dto;
 
-import com.popq.platform.entity.Order;
-import com.popq.platform.entity.OrderStatus;
+import com.popq.platform.order.entity.Order;
+import com.popq.platform.order.entity.OrderStatus;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @NoArgsConstructor
-public class OrderResponse {
+public class OrderDetailResponse {
 
     private Long orderId;
-    private String tossOrderId;
     private int totalPrice;
     private OrderStatus orderStatus;
+
     private LocalDateTime orderedAt;
     private LocalDateTime paymentAt;
     private LocalDateTime expiresAt;
 
-    public static OrderResponse from(Order order) {
-        OrderResponse response = new OrderResponse();
+    private List<OrderItemResponse> items;
+
+    public static OrderDetailResponse from(Order order) {
+        OrderDetailResponse response = new OrderDetailResponse();
 
         response.orderId = order.getOrderId();
-        response.tossOrderId = order.getTossOrderId();
         response.totalPrice = order.getTotalPrice();
         response.orderStatus = order.getOrderStatus();
         response.orderedAt = order.getOrderedAt();
         response.paymentAt = order.getPaymentAt();
         response.expiresAt = order.getExpiresAt();
+
+        response.items = order.getOrderItems().stream()
+                .map(OrderItemResponse::from)
+                .toList();
 
         return response;
     }

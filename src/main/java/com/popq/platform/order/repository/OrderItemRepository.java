@@ -1,8 +1,8 @@
-package com.popq.platform.repository;
+package com.popq.platform.order.repository;
 
-import com.popq.platform.entity.Order;
-import com.popq.platform.entity.OrderItem;
-import com.popq.platform.entity.OrderStatus;
+import com.popq.platform.order.entity.Order;
+import com.popq.platform.order.entity.OrderItem;
+import com.popq.platform.order.entity.OrderStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

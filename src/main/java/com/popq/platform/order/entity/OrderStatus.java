@@ -1,4 +1,4 @@
-package com.popq.platform.entity;
+package com.popq.platform.order.entity;
 
 public enum OrderStatus {
     PENDING,   // 결제 대기

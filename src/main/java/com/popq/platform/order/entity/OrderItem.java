@@ -1,5 +1,6 @@
-package com.popq.platform.entity;
+package com.popq.platform.order.entity;
 
+import com.popq.platform.entity.Product;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
