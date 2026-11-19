@@ -32,12 +32,14 @@ public class TimeSlotService {
     TimeSlotRepository timeSlotRepo;
     PopupStoreRepository popupRepo;
     ReservationRepository reservationRepo;
+    PopupAccessService accessService;
 
     @Autowired
-    public TimeSlotService(TimeSlotRepository timeSlotRepo, PopupStoreRepository popupRepo, ReservationRepository reservationRepo) {
+    public TimeSlotService(TimeSlotRepository timeSlotRepo, PopupStoreRepository popupRepo, ReservationRepository reservationRepo, PopupAccessService accessService) {
         this.timeSlotRepo = timeSlotRepo;
         this.popupRepo = popupRepo;
         this.reservationRepo = reservationRepo;
+        this.accessService = accessService;
     }
 
     // 회차 목록 (date가 있으면 그 날짜만)
@@ -58,8 +60,9 @@ public class TimeSlotService {
 
     // 회차 1개 등록 : 등록된 회차 정보 반환
     @Transactional
-    public TimeSlotResponse insertTimeSlot(Long popId, TimeSlotRequest request) { // popId는 URL에서 받음
+    public TimeSlotResponse insertTimeSlot(Long popId, TimeSlotRequest request, String username) { // popId는 URL에서 받음
         PopupStore popup = findPopupForUpdate(popId); // 동시에 등록해도 겹치는 회차가 생기지 않도록
+        accessService.checkAccess(popup, accessService.getLoginUser(username));
         checkTimeSlot(popup, request);
         if (timeSlotRepo.existsOverlap(
                 popup.getPopId(), request.getSlotDate(), request.getStartTime(), request.getEndTime())) {
@@ -72,8 +75,9 @@ public class TimeSlotService {
     // 자동 생성 : 생성된 개수 반환
     // 예) 10:00~16:00, 60분, 점심 12:30~13:30 → 10:00, 11:00, 13:30, 14:30
     @Transactional
-    public int generateTimeSlots(Long popId, TimeSlotGenerateRequest request) { // popId는 URL에서 받음
+    public int generateTimeSlots(Long popId, TimeSlotGenerateRequest request, String username) { // popId는 URL에서 받음
         PopupStore popup = findPopupForUpdate(popId); // 생성 버튼을 두 번 눌러도 회차가 중복 생성되지 않도록
+        accessService.checkAccess(popup, accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
         fillDefaults(popup, request);
         checkGenerate(popup, request);
 
@@ -87,9 +91,10 @@ public class TimeSlotService {
 
     // 예약 이력이 있으면(취소, 만료 포함) 날짜/시간은 못 바꾸고 정원만 변경 가능
     @Transactional
-    public TimeSlotResponse updateTimeSlot(Long timeSlotId, TimeSlotRequest request) {
+    public TimeSlotResponse updateTimeSlot(Long timeSlotId, TimeSlotRequest request, String username) {
         TimeSlot slot = findTimeSlotForUpdate(timeSlotId); // 락 : 수정 중에 예약 인원이 바뀌지 않도록
         PopupStore popup = slot.getPopupStore();
+        accessService.checkAccess(popup, accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
         checkTimeSlot(popup, request);
 
         if (reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId)) {
@@ -113,8 +118,9 @@ public class TimeSlotService {
 
     // 예약이 있거나 예약 이력이 있으면 삭제 불가
     @Transactional
-    public void deleteTimeSlot(Long timeSlotId) {
+    public void deleteTimeSlot(Long timeSlotId, String username) {
         TimeSlot slot = findTimeSlotForUpdate(timeSlotId); // 락 : 삭제 중에 예약이 들어오지 않도록
+        accessService.checkAccess(slot.getPopupStore(), accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
         if (reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId)) { // 취소, 만료된 예약도 포함
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_HAS_RESERVATIONS);
         }

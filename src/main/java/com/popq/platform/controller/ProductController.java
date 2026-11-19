@@ -4,6 +4,7 @@ import com.popq.platform.dto.ProductRequest;
 import com.popq.platform.dto.ProductResponse;
 import com.popq.platform.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,30 +30,33 @@ public class ProductController {
         return service.detailProduct(prdId);
     }
 
-    // 아래 등록/수정/재고 조정/삭제는 /api/admin/** 이라 SecurityConfig에서 ADMIN만 호출 가능
+    // 아래는 /api/admin/** 관리자 API : ADMIN은 모든 팝업, MANAGER는 본인 팝업의 상품만 (서비스에서 확인)
 
     // 상품 등록
     @PostMapping("/api/admin/popups/{popId}/products")
-    public ProductResponse insertProduct(@PathVariable("popId") Long popId, @RequestBody ProductRequest request) {
-        return service.insertProduct(popId, request); // 등록된 상품 정보 반환
+    public ProductResponse insertProduct(@PathVariable("popId") Long popId, @RequestBody ProductRequest request,
+                                         @AuthenticationPrincipal String username) {
+        return service.insertProduct(popId, request, username); // 등록된 상품 정보 반환
     }
 
     // 상품 수정 (재고는 수정되지 않음, 판매 시작 후에는 판매 시작일시 변경 불가)
     @PutMapping("/api/admin/products/{prdId}")
-    public ProductResponse updateProduct(@PathVariable("prdId") Long prdId, @RequestBody ProductRequest request) {
-        return service.updateProduct(prdId, request);
+    public ProductResponse updateProduct(@PathVariable("prdId") Long prdId, @RequestBody ProductRequest request,
+                                         @AuthenticationPrincipal String username) {
+        return service.updateProduct(prdId, request, username);
     }
 
     // 재고 조정
     // /api/admin/products/1/stock?quantity=10 추가 / ?quantity=-5 차감 (판매 시작 후에는 추가만 가능)
     @PutMapping("/api/admin/products/{prdId}/stock")
-    public ProductResponse adjustStock(@PathVariable("prdId") Long prdId, @RequestParam("quantity") Integer quantity) {
-        return service.adjustStock(prdId, quantity); // 조정 후 상품 정보 반환
+    public ProductResponse adjustStock(@PathVariable("prdId") Long prdId, @RequestParam("quantity") Integer quantity,
+                                       @AuthenticationPrincipal String username) {
+        return service.adjustStock(prdId, quantity, username); // 조정 후 상품 정보 반환
     }
 
     // 상품 삭제
     @DeleteMapping("/api/admin/products/{prdId}")
-    public void deleteProduct(@PathVariable("prdId") Long prdId) {
-        service.deleteProduct(prdId);
+    public void deleteProduct(@PathVariable("prdId") Long prdId, @AuthenticationPrincipal String username) {
+        service.deleteProduct(prdId, username);
     }
 }
