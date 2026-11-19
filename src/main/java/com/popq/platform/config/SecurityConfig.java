@@ -35,19 +35,22 @@ public class SecurityConfig {
                         .securityContextRepository(new RequestAttributeSecurityContextRepository())
                 )
                 .authorizeHttpRequests(auth -> auth
-                        //업로드된 이미지 파일 조회 경로는 인증 없이 누구나 접근 가능
+                        // 업로드된 이미지 파일 조회 경로는 인증 없이 누구나 접근 가능
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 
-                        //회원가입 및 로그인 등 인증 없이 접근해야 하는 경로 허용
+                        // 회원가입 및 로그인 등 인증 없이 접근해야 하는 경로 허용
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        //관리자만 접근 가능한 API 경로 설정
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // 순수 ADMIN만 접근 가능한 경로
+                        .requestMatchers("/api/admin/members/**").hasRole("ADMIN")
 
-                        //테스트용 API 등 인증이 필요한 경로 설정
+                        // ADMIN과 MANAGER 모두 접근 가능한 관리자 API 경로
+                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        // 테스트용 API 등 인증이 필요한 경로 설정
                         .requestMatchers("/api/test").authenticated()
 
-                        //그 외 나머지 요청은 인증된 사용자 모두 접근 가능
+                        // 그 외 나머지 요청은 인증된 사용자 모두 접근 가능
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
