@@ -124,6 +124,6 @@ public class QnaService {
 
     private Qna getQna(Long qnaId) {
         return qnaRepository.findById(qnaId)
-                .orElseThrow(() -> new QnaException(QnaErrorCode.MEMBER_NOT_FOUND));
+                .orElseThrow(() -> new QnaException(QnaErrorCode.QNA_NOT_FOUND));
     }
 }
