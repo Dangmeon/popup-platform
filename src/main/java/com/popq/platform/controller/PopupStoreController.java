@@ -4,6 +4,9 @@ import com.popq.platform.dto.ManagerResponse;
 import com.popq.platform.dto.PopupManagerRequest;
 import com.popq.platform.dto.PopupStoreRequest;
 import com.popq.platform.dto.PopupStoreResponse;
+import com.popq.platform.reservation.dto.AdminReservationResponse;
+import com.popq.platform.reservation.entity.ReservationStatus;
+import com.popq.platform.reservation.service.AdminReservationService;
 import com.popq.platform.service.PopupStoreService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,10 +18,15 @@ import java.util.List;
 public class PopupStoreController {
 
     PopupStoreService service;
+    AdminReservationService adminReservationService;
 
     @Autowired
-    public PopupStoreController(PopupStoreService service) {
+    public PopupStoreController(
+            PopupStoreService service,
+            AdminReservationService adminReservationService
+    ) {
         this.service = service;
+        this.adminReservationService = adminReservationService;
     }
 
     // 팝업 목록 조회
@@ -94,5 +102,16 @@ public class PopupStoreController {
     public PopupStoreResponse assignManager(@PathVariable("popId") Long popId, @RequestBody PopupManagerRequest request,
                                             @AuthenticationPrincipal String username) {
         return service.assignManager(popId, request, username);
+    }
+
+    // 관리자 팝업별 예약 현황 조회
+    @GetMapping("/api/admin/popups/{popId}/reservations")
+    public List<AdminReservationResponse> listAdminReservation(
+            @PathVariable Long popId,
+            @AuthenticationPrincipal String username,
+            @RequestParam(value = "status", required = false)ReservationStatus status
+            ){
+
+        return adminReservationService.getReservations(username, popId, status);
     }
 }
