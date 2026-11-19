@@ -15,8 +15,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -167,6 +169,27 @@ public class CartService {
         Cart cart = findOwnedCart(cartItemId, user.getId());
 
         cartRepository.delete(cart);
+        cartRepository.flush();
+    }
+
+    // 주문에 포함된 상품만 해당 회원의 장바구니에서 제거합니다.
+    @Transactional
+    public void removeItemsByProductIds(String username, List<Long> prdIds) {
+        if (prdIds == null || prdIds.isEmpty()) {
+            return;
+        }
+
+        Set<Long> requestedIds = new HashSet<>();
+        for (Long prdId : prdIds) {
+            validateId(prdId, "상품 번호");
+            requestedIds.add(prdId);
+        }
+
+        User member = findMember(username, true);
+        List<Cart> items = cartRepository.findByMemberId(member.getId()).stream()
+                .filter(item -> requestedIds.contains(item.getPrdId()))
+                .toList();
+        cartRepository.deleteAll(items);
         cartRepository.flush();
     }
 
