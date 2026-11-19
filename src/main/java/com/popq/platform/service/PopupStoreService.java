@@ -1,8 +1,12 @@
 package com.popq.platform.service;
 
+import com.popq.platform.dto.ManagerResponse;
+import com.popq.platform.dto.PopupManagerRequest;
 import com.popq.platform.dto.PopupStoreRequest;
 import com.popq.platform.dto.PopupStoreResponse;
 import com.popq.platform.entity.PopupStore;
+import com.popq.platform.entity.Role;
+import com.popq.platform.entity.User;
 import com.popq.platform.exception.PopupErrorCode;
 import com.popq.platform.exception.PopupException;
 import com.popq.platform.repository.PopupStoreRepository;
@@ -24,12 +28,14 @@ public class PopupStoreService {
     PopupStoreRepository popupRepo;
     TimeSlotRepository timeSlotRepo;
     ProductRepository productRepo;
+    PopupAccessService accessService;
 
     @Autowired
-    public PopupStoreService(PopupStoreRepository popupRepo, TimeSlotRepository timeSlotRepo, ProductRepository productRepo) {
+    public PopupStoreService(PopupStoreRepository popupRepo, TimeSlotRepository timeSlotRepo, ProductRepository productRepo, PopupAccessService accessService) {
         this.popupRepo = popupRepo;
         this.timeSlotRepo = timeSlotRepo;
         this.productRepo = productRepo;
+        this.accessService = accessService;
     }
 
     // 전체 팝업 조회
@@ -47,22 +53,40 @@ public class PopupStoreService {
         return toDtoList(popupRepo.findByCategory(category));
     }
 
+    // 관리자 팝업 목록 : ADMIN은 전체, MANAGER는 본인 팝업만 / keyword(팝업명·장소), opStatus 필터, 시작일 최신순
+    public List<PopupStoreResponse> listAdminPopup(String username, String keyword, String opStatus) {
+        Long managerId = accessService.getManagerIdForList(username);
+        if (keyword == null || keyword.isBlank()) { // 빈 검색어는 검색 안 함
+            keyword = null;
+        } else {
+            keyword = keyword.trim();
+        }
+        if (opStatus != null && opStatus.isBlank()) {
+            opStatus = null;
+        }
+        return toDtoList(popupRepo.findAdminList(managerId, keyword, opStatus));
+    }
+
     // 팝업 등록 : 등록된 팝업 정보 반환
     @Transactional
-    public PopupStoreResponse insertPopup(PopupStoreRequest request) {
+    public PopupStoreResponse insertPopup(PopupStoreRequest request, String username) {
         checkRequired(request);
         checkPeriod(request);
         checkReservTime(request);
         checkNumbers(request); // 예약 정원, 오픈 차수 확인
-        PopupStore saved = popupRepo.save(PopupStore.toEntity(null, request)); // popId가 null이면 insert
+        PopupStore popup = PopupStore.toEntity(null, request);
+        User loginUser = accessService.getLoginUser(username);
+        if (loginUser.getRole() == Role.MANAGER) {
+            popup.assignManager(loginUser);
+        }
+        PopupStore saved = popupRepo.save(popup); // popId가 null이면 insert
         return PopupStoreResponse.toDto(saved);
     }
 
     // 팝업 수정 : 조회한 팝업의 값을 바꾸면 트랜잭션 끝날 때 자동 UPDATE (save 호출 X) / 수정된 팝업 정보 반환
     @Transactional
-    public PopupStoreResponse updatePopup(Long popId, PopupStoreRequest request) {
-        PopupStore popup = popupRepo.findById(popId)
-                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
+    public PopupStoreResponse updatePopup(Long popId, PopupStoreRequest request, String username) {
+        PopupStore popup = accessService.checkPopupAccess(popId, username); // 없으면 404, 담당이 아니면 403
         checkRequired(request);
         checkPeriod(request);
         checkReservTime(request);
@@ -75,8 +99,8 @@ public class PopupStoreService {
 
     // 팝업 삭제
     @Transactional
-    public void deletePopup(Long popId) {
-        PopupStore popup = popupRepo.findById(popId).orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
+    public void deletePopup(Long popId, String username) {
+        PopupStore popup = accessService.checkPopupAccess(popId, username); // 없으면 404, 담당이 아니면 403
         // 회차가 등록된 팝업은 FK 때문에 삭제 불가 -> 500 대신 409 메시지로 안내 / 없는 팝업이면 404
         if (timeSlotRepo.existsByPopId(popId)) {
             throw new PopupException(PopupErrorCode.POPUP_HAS_TIMESLOTS);
@@ -93,6 +117,26 @@ public class PopupStoreService {
         PopupStore entity = popupRepo.findById(popId)
                 .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
         return PopupStoreResponse.toDto(entity);
+    }
+
+    // 매니저 목록 (ADMIN 전용) : 배정 드롭다운용
+    public List<ManagerResponse> listManagers(String username) {
+        return accessService.listManagers(username);
+    }
+
+    // 담당 매니저 배정 (ADMIN 전용) : managerEmail을 비우면 배정 해제 / 바뀐 팝업 정보 반환
+    @Transactional
+    public PopupStoreResponse assignManager(Long popId, PopupManagerRequest request, String username) {
+        accessService.checkAdmin(username); // ADMIN이 아니면 403
+        PopupStore popup = popupRepo.findById(popId)
+                .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
+        String email = request.getManagerEmail();
+        if (email == null || email.isBlank()) {
+            popup.assignManager(null); // 배정 해제
+        } else {
+            popup.assignManager(accessService.getManagerByEmail(email)); // 없으면 404, MANAGER가 아니면 400
+        }
+        return PopupStoreResponse.toDto(popup);
     }
 
     // entity 목록 -> response 목록 변환

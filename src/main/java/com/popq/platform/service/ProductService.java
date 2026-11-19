@@ -10,6 +10,7 @@ import com.popq.platform.exception.ProductErrorCode;
 import com.popq.platform.exception.ProductException;
 import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.repository.ProductRepository;
+import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -24,11 +25,15 @@ import java.util.List;
 public class ProductService {
     ProductRepository productRepo;
     PopupStoreRepository popupRepo;
+    PopupAccessService accessService;
+    EntityManager em; // 재고 조정 후 최신 재고를 다시 읽을 때 사용
 
     @Autowired
-    public ProductService(ProductRepository productRepo, PopupStoreRepository popupRepo) {
+    public ProductService(ProductRepository productRepo, PopupStoreRepository popupRepo, PopupAccessService accessService, EntityManager em) {
         this.productRepo = productRepo;
         this.popupRepo = popupRepo;
+        this.accessService = accessService;
+        this.em = em;
     }
 
     // 팝업의 상품 목록
@@ -49,8 +54,8 @@ public class ProductService {
 
     // 상품 등록 : 등록된 상품 정보 반환
     @Transactional
-    public ProductResponse insertProduct(Long popId, ProductRequest request) {
-        PopupStore popup = findPopup(popId);
+    public ProductResponse insertProduct(Long popId, ProductRequest request, String username) {
+        PopupStore popup = accessService.checkPopupAccess(popId, username); // 없으면 404, 담당이 아니면 403
         checkProduct(popup, request);
         // DB에 DEFAULT 0이 있어도 JPA는 null을 그대로 INSERT 하므로 여기서 확인
         if (request.getStock() == null || request.getStock() < 0) {
@@ -62,9 +67,10 @@ public class ProductService {
 
     // 상품 수정 : 팝업은 바꿀 수 없고, 재고는 수정되지 않음 (재고 조정 API 사용) / 수정된 상품 정보 반환
     @Transactional
-    public ProductResponse updateProduct(Long prdId, ProductRequest request) {
+    public ProductResponse updateProduct(Long prdId, ProductRequest request, String username) {
         Product product = findProduct(prdId);
         PopupStore popup = product.getPopupStore();
+        accessService.checkAccess(popup, accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
         checkProduct(popup, request);
         checkSalePeriodChange(product, request);
         product.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE
@@ -73,17 +79,17 @@ public class ProductService {
 
     // 재고 조정 : quantity 양수면 추가, 음수면 차감 / 조정 후 상품 정보 반환
     @Transactional
-    public ProductResponse adjustStock(Long prdId, Integer quantity) {
+    public ProductResponse adjustStock(Long prdId, Integer quantity, String username) {
         if (quantity == null || quantity == 0) {
             throw new ProductException(ProductErrorCode.INVALID_STOCK_QUANTITY);
         }
+        Product product = findProduct(prdId); // 없는 상품이면 404
+        accessService.checkAccess(product.getPopupStore(), accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
         // 판매가 시작된 상품은 재고 추가만 가능
-        if (quantity < 0) {
-            Product product = findProduct(prdId);
-            if (!LocalDateTime.now().isBefore(product.getSaleStart())) {
-                throw new ProductException(ProductErrorCode.STOCK_DECREASE_NOT_ALLOWED);
-            }
+        if (quantity < 0 && !LocalDateTime.now().isBefore(product.getSaleStart())) {
+            throw new ProductException(ProductErrorCode.STOCK_DECREASE_NOT_ALLOWED);
         }
+
         int result;
         if (quantity > 0) {
             result = productRepo.increaseStock(prdId, quantity);
@@ -91,16 +97,17 @@ public class ProductService {
             result = productRepo.decreaseStock(prdId, -quantity); // 재고가 충분할 때만 차감
         }
         if (result == 0) {
-            findProduct(prdId); // 없는 상품이면 여기서 PRODUCT_NOT_FOUND 예외
-            throw new ProductException(ProductErrorCode.STOCK_SHORTAGE);
+            throw new ProductException(ProductErrorCode.STOCK_SHORTAGE); // 상품은 위에서 이미 확인함
         }
-        return ProductResponse.toDto(findProduct(prdId)); // UPDATE 후 영속성 컨텍스트가 비워져서 DB에서 다시 조회됨
+        em.refresh(product); // UPDATE 쿼리는 이미 조회한 객체를 바꾸지 않으므로 DB에서 바뀐 재고를 다시 읽어옴
+        return ProductResponse.toDto(product);
     }
 
     // 상품 삭제 : 주문 내역이 있으면 삭제 불가 (order_item FK)
     @Transactional
-    public void deleteProduct(Long prdId) {
+    public void deleteProduct(Long prdId, String username) {
         Product product = findProduct(prdId);
+        accessService.checkAccess(product.getPopupStore(), accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
         try {
             productRepo.delete(product);
             productRepo.flush(); // 여기서 바로 DELETE 실행해야 FK 에러를 잡을 수 있음
