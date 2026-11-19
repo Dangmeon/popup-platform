@@ -7,11 +7,14 @@ import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.popq.platform.dto.TimeSlotChangedEvent;
 import com.popq.platform.redis.RedisExpirationKeyService;
+import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.reservation.dto.ReservationCreateRequest;
 import com.popq.platform.reservation.dto.ReservationDetailResponse;
 import com.popq.platform.reservation.dto.ReservationResponse;
 import com.popq.platform.reservation.dto.ReservationUpdateRequest;
 import com.popq.platform.entity.*;
+import com.popq.platform.reservation.entity.Reservation;
+import com.popq.platform.reservation.entity.ReservationStatus;
 import com.popq.platform.reservation.exception.ReservationErrorCode;
 import com.popq.platform.reservation.exception.ReservationException;
 import com.popq.platform.reservation.redis.ReservationExpirationService;
@@ -75,6 +78,16 @@ public class ReservationService {
                 .orElseThrow(() -> new ReservationException(
                         ReservationErrorCode.TIMESLOT_NOT_FOUND
                 ));
+
+        // 팝업 운영 상태 확인
+        if(!"OPEN".equals(timeSlot.getPopupStore().getOpStatus())){
+            throw new ReservationException(ReservationErrorCode.POPUP_NOT_OPEN);
+        }
+
+        // 회차 운영 상태 확인
+        if(!"OPEN".equals(timeSlot.getSlotStatus())){
+            throw new ReservationException(ReservationErrorCode.TIMESLOT_NOT_OPEN);
+        }
 
         // 4. 예약 가능한 날짜/시간인지 확인
         LocalDateTime openAt = LocalDateTime.of(
@@ -275,6 +288,11 @@ public class ReservationService {
             oldTimeSlot = oldTimeSlotId.equals(firstId) ? firstTimeSlot : secondTimeSlot;
 
             newTimeSlot = newTimeSlotId.equals(firstId) ? firstTimeSlot : secondTimeSlot;
+
+            // 변경할 회차 운영 상태 확인
+            if (!"OPEN".equals(newTimeSlot.getSlotStatus())) {
+                throw new ReservationException(ReservationErrorCode.TIMESLOT_NOT_OPEN);
+            }
         }
 
         // 6. 변경할 회차의 예약 가능 기간 확인
@@ -473,6 +491,26 @@ public class ReservationService {
             throw new ReservationException(
                     ReservationErrorCode.QR_GENERATION_FAILED
             );
+        }
+    }
+
+    @Transactional
+    public void cancelAllBySlot(Long timeSlotId){
+
+        List<Reservation> reservations = reservationRepository.findActiveReservationsByTimeSlot(
+                timeSlotId,
+                List.of(ReservationStatus.HOLD, ReservationStatus.CONFIRMED)
+        );
+
+        for(Reservation reservation : reservations){
+
+            if(reservation.getReservationStatus() == ReservationStatus.HOLD){
+                redisExpirationKeyService.delete(
+                        "reservation:hold:" + reservation.getReservationId()
+                );
+            }
+
+            reservation.cancel();
         }
     }
 }

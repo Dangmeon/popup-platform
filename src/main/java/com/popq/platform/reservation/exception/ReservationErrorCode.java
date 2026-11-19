@@ -17,7 +17,9 @@ public enum ReservationErrorCode {
     CANCELLATION_DEADLINE_PASSED(HttpStatus.CONFLICT, "취소 가능 시간이 지났습니다."),
     QR_TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND, "QR 정보를 찾을 수 없습니다."),
     QR_NOT_AVAILABLE(HttpStatus.CONFLICT, "현재 예약 상태에서는 QR을 사용할 수 없습니다."),
-    QR_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "QR 코드 생성에 실패했습니다.");
+    QR_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "QR 코드 생성에 실패했습니다."),
+    POPUP_NOT_OPEN(HttpStatus.CONFLICT, "현재 운영 중인 팝업만 예약할 수 있습니다."),
+    TIMESLOT_NOT_OPEN(HttpStatus.CONFLICT, "현재 예약 가능한 회차가 아닙니다.");
 
     private final HttpStatus status;
     private final String message;

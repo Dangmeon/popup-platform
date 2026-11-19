@@ -1,5 +1,7 @@
-package com.popq.platform.entity;
+package com.popq.platform.reservation.entity;
 
+import com.popq.platform.entity.TimeSlot;
+import com.popq.platform.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 

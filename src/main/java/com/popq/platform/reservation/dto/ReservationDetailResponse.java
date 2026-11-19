@@ -1,8 +1,8 @@
 package com.popq.platform.reservation.dto;
 
 import com.popq.platform.entity.PopupStore;
-import com.popq.platform.entity.Reservation;
-import com.popq.platform.entity.ReservationStatus;
+import com.popq.platform.reservation.entity.Reservation;
+import com.popq.platform.reservation.entity.ReservationStatus;
 import com.popq.platform.entity.TimeSlot;
 
 import java.time.LocalDate;

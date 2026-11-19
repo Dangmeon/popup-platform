@@ -1,8 +1,8 @@
 package com.popq.platform.reservation.redis;
 
 import com.popq.platform.dto.TimeSlotChangedEvent;
-import com.popq.platform.entity.Reservation;
-import com.popq.platform.entity.ReservationStatus;
+import com.popq.platform.reservation.entity.Reservation;
+import com.popq.platform.reservation.entity.ReservationStatus;
 import com.popq.platform.entity.TimeSlot;
 import com.popq.platform.reservation.exception.ReservationErrorCode;
 import com.popq.platform.reservation.exception.ReservationException;
