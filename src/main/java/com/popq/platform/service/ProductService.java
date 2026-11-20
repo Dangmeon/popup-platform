@@ -56,6 +56,9 @@ public class ProductService {
     @Transactional
     public ProductResponse insertProduct(Long popId, ProductRequest request, String username) {
         PopupStore popup = accessService.checkPopupAccess(popId, username); // 없으면 404, 담당이 아니면 403
+
+        popup.validateNotCancelled(); // 취소된 팝업의 하위 굿즈는 등록 불가
+
         checkProduct(popup, request);
         // DB에 DEFAULT 0이 있어도 JPA는 null을 그대로 INSERT 하므로 여기서 확인
         if (request.getStock() == null || request.getStock() < 0) {
@@ -71,6 +74,9 @@ public class ProductService {
         Product product = findProduct(prdId);
         PopupStore popup = product.getPopupStore();
         accessService.checkAccess(popup, accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
+
+        popup.validateNotCancelled(); // 취소된 팝업의 하위 굿즈는 수정 불가
+
         checkProduct(popup, request);
         checkSalePeriodChange(product, request);
         product.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE
@@ -84,7 +90,11 @@ public class ProductService {
             throw new ProductException(ProductErrorCode.INVALID_STOCK_QUANTITY);
         }
         Product product = findProduct(prdId); // 없는 상품이면 404
+        PopupStore popup = product.getPopupStore();
         accessService.checkAccess(product.getPopupStore(), accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
+
+        popup.validateNotCancelled(); // 취소된 팝업의 하위 굿즈는 재고 조정 불가
+
         // 판매가 시작된 상품은 재고 추가만 가능
         if (quantity < 0 && !LocalDateTime.now().isBefore(product.getSaleStart())) {
             throw new ProductException(ProductErrorCode.STOCK_DECREASE_NOT_ALLOWED);
@@ -107,7 +117,11 @@ public class ProductService {
     @Transactional
     public void deleteProduct(Long prdId, String username) {
         Product product = findProduct(prdId);
+        PopupStore popup = product.getPopupStore();
         accessService.checkAccess(product.getPopupStore(), accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
+
+        popup.validateNotCancelled(); // 취소된 팝업의 하위 굿즈는 삭제 불가
+
         try {
             productRepo.delete(product);
             productRepo.flush(); // 여기서 바로 DELETE 실행해야 FK 에러를 잡을 수 있음

@@ -21,7 +21,13 @@ public enum PopupErrorCode {
     POPUP_ACCESS_DENIED(HttpStatus.FORBIDDEN, "담당 팝업만 관리할 수 있습니다."),
     ADMIN_ONLY(HttpStatus.FORBIDDEN, "관리자만 사용할 수 있는 기능입니다."),
     MANAGER_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 이메일의 회원을 찾을 수 없습니다."),
-    NOT_MANAGER_ROLE(HttpStatus.BAD_REQUEST, "팝업 매니저(MANAGER) 회원만 담당자로 지정할 수 있습니다.");
+    NOT_MANAGER_ROLE(HttpStatus.BAD_REQUEST, "팝업 매니저(MANAGER) 회원만 담당자로 지정할 수 있습니다."),
+
+    // 팀장 작성 --------- 팝업 상태 관리 관련 ErrorCode
+    POPUP_CANCELLED_MODIFICATION_DENIED(HttpStatus.CONFLICT, "종료된 팝업은 수정하거나 하위 회차·상품을 변경할 수 없습니다."),
+    POPUP_ALREADY_PAUSED(HttpStatus.CONFLICT, "이미 일시 중단된 팝업입니다."),
+    POPUP_NOT_PAUSED(HttpStatus.CONFLICT, "일시 중단 상태인 팝업만 재개할 수 있습니다."),
+    POPUP_ALREADY_CANCELLED(HttpStatus.CONFLICT, "이미 종료(취소)된 팝업입니다.");
 
     private final HttpStatus status;
     private final String message;

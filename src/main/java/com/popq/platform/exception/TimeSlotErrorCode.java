@@ -22,7 +22,12 @@ public enum TimeSlotErrorCode {
     SLOT_TIME_OUT_OF_RESERV_TIME(HttpStatus.BAD_REQUEST, "회차 시간은 팝업 예약 시간 안이어야 합니다."),
     LUNCH_TIME_PAIR_REQUIRED(HttpStatus.BAD_REQUEST, "점심시간은 lunchStart, lunchEnd를 같이 입력해주세요."),
     INVALID_INTERVAL(HttpStatus.BAD_REQUEST, "회차 간격은 30분 이상이어야 합니다."),
-    INVALID_BREAK_MINUTES(HttpStatus.BAD_REQUEST, "정비시간은 0분 이상이어야 합니다.");
+    INVALID_BREAK_MINUTES(HttpStatus.BAD_REQUEST, "정비시간은 0분 이상이어야 합니다."),
+
+    // 팀장 작성 --------- 이하 슬롯 예외 추가
+
+    TIMESLOT_ALREADY_CANCELLED(HttpStatus.CONFLICT, "이미 취소된 회차입니다."),
+    TIMESLOT_ALREADY_STARTED(HttpStatus.CONFLICT, "이미 시작된 회차는 취소할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

@@ -35,4 +35,10 @@ public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM PopupStore p WHERE p.popId = :popId")
     Optional<PopupStore> findByIdWithPessimisticLock(@Param("popId") Long popId);
+
+    // 팅장 작성 ----
+
+    // 전체 조회에서 CANCELLED 상태만 제외하고 모두 찾는 쿼리
+    @Query("SELECT p FROM PopupStore p WHERE p.opStatus <> 'CANCELLED' ORDER BY p.startDate DESC")
+    List<PopupStore> findAllActive();
 }
