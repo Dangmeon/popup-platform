@@ -6,6 +6,8 @@ import com.popq.platform.entity.Role;
 import com.popq.platform.entity.User;
 import com.popq.platform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +59,13 @@ public class UserService {
         String roleName = (user.getRole() != null) ? user.getRole().name() : Role.USER.name();
 
         return jwtTokenProvider.createToken(user.getUsername(), roleName);
+    }
+
+    // 전체 회원 조회 로직 (페이징)
+    @Transactional(readOnly = true)
+    public Page<MemberInfoResponse> getAllMembers(Pageable pageable) {
+        return userRepository.findAll(pageable)
+                .map(MemberInfoResponse::from);
     }
 
     // 회원 정보 조회 로직
