@@ -10,6 +10,8 @@ import com.popq.platform.exception.PaymentException;
 import com.popq.platform.redis.RedisExpirationKeyService;
 import com.popq.platform.order.repository.OrderRepository;
 import com.popq.platform.payment.repository.PaymentRepository;
+import com.popq.platform.repository.CouponRepository;
+import com.popq.platform.service.CouponService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -33,6 +35,7 @@ public class PaymentService {
     private final RedisExpirationKeyService redisExpirationKeyService;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final CouponService couponService;
 
     @Value("${toss.secret-key}")
     private String tossSecretKey;
@@ -64,6 +67,13 @@ public class PaymentService {
         );
 
         paymentRepository.save(payment);
+
+        if (order.getUserCoupon() != null) {
+            couponService.useCoupon(
+                    order.getUser().getUsername(),
+                    order.getUserCoupon().getId()
+            );
+        }
 
         order.completePayment();
 
