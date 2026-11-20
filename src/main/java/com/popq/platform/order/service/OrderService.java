@@ -17,6 +17,7 @@ import com.popq.platform.repository.ProductRepository;
 import com.popq.platform.repository.UserRepository;
 import com.popq.platform.payment.service.PaymentService;
 import com.popq.platform.service.CartService;
+import com.popq.platform.service.CouponService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class OrderService {
     private final RedisExpirationKeyService redisExpirationKeyService;
     private final PaymentService paymentService;
     private final CartService cartService;
+    private final CouponService couponService;
 
     // 주문 생성
     @Transactional
@@ -107,7 +109,11 @@ public class OrderService {
         Order order = Order.createOrder(
                 user,
                 totalPrice,
-                expiresAt
+                expiresAt,
+                request.getReceiverName(),
+                request.getReceiverPhone(),
+                request.getReceiverAddress(),
+                request.getDeliveryMemo()
         );
 
         // 3. OrderItem 생성 + Order에 추가
@@ -115,11 +121,13 @@ public class OrderService {
 
             Product product = productMap.get(item.getPrdId());
 
+            int uniPrice = product.getPrice();
             int price = product.getPrice() * item.getQuantity();
 
             OrderItem orderItem = OrderItem.createOrderItem(
                     product,
                     item.getQuantity(),
+                    uniPrice,
                     price
             );
 
@@ -233,6 +241,14 @@ public class OrderService {
                 .stream()
                 .map(AdminOrderResponse::from)
                 .toList();
+    }
+
+    public AdminOrderDetailResponse getAdminOrderDetail(Long orderId) {
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        return AdminOrderDetailResponse.from(order);
     }
 
     private void restoreStock(Order order) {

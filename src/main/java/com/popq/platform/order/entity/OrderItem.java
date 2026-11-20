@@ -38,15 +38,19 @@ public class OrderItem {
     @Column(name = "PRICE", nullable = false)
     private int price;
 
+    @Column(name = "UNIT_PRICE", nullable = false)
+    private int unitPrice;
+
     public void assignOrder(Order order) {
         this.order = order;
     }
 
-    public static OrderItem createOrderItem(Product product, Integer quantity, int price) {
+    public static OrderItem createOrderItem(Product product, Integer quantity, int unitPrice, int price) {
         OrderItem orderItem = new OrderItem();
 
         orderItem.product = product;
         orderItem.quantity = quantity;
+        orderItem.unitPrice = unitPrice;
         orderItem.price = price;
 
         return orderItem;
