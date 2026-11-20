@@ -32,4 +32,12 @@ public class UserCoupon {
         this.coupon = coupon;
         this.issuedAt = LocalDateTime.now();
     }
+
+    // 쿠폰 사용 처리
+    public void markAsUsed() {
+        if (this.isUsed) {
+            throw new IllegalArgumentException("이미 사용한 쿠폰입니다.");
+        }
+        this.isUsed = true;
+    }
 }
