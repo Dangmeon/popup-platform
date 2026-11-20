@@ -1,5 +1,7 @@
 package com.popq.platform.exception;
 
+import com.popq.platform.qna.exception.QnaErrorCode;
+import com.popq.platform.qna.exception.QnaException;
 import com.popq.platform.order.exception.OrderException;
 import com.popq.platform.reservation.exception.ReservationException;
 import com.popq.platform.waiting.exception.WaitingErrorCode;
@@ -125,7 +127,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
     }
 
-
     // 이미지 에러 처리
     @ExceptionHandler(ImageException.class)
     public ResponseEntity<Map<String, String>> handleImageException(ImageException ex) {
@@ -162,5 +163,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
                 .body(response);
+    }
+
+    // QnA 관련 예외 처리
+    @ExceptionHandler(QnaException.class)
+    public ResponseEntity<ErrorResponse> handleQnaException(QnaException ex) {
+        QnaErrorCode errorCode = ex.getErrorCode();
+
+        ErrorResponse response = new ErrorResponse(
+                errorCode.name(),
+                errorCode.getMessage(),
+                null
+        );
+
+        return ResponseEntity.status(errorCode.getStatus()).body(response);
     }
 }

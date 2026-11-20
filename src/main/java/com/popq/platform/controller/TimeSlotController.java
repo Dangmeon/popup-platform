@@ -69,4 +69,13 @@ public class TimeSlotController {
     public void deleteTimeSlot(@PathVariable("timeSlotId") Long timeSlotId, @AuthenticationPrincipal String username) {
         service.deleteTimeSlot(timeSlotId, username);
     }
+
+    // -----------------------------
+
+    // 개별 회차 취소 (복구 불가)
+    @PatchMapping("/api/admin/slots/{timeSlotId}/cancel")
+    public TimeSlotResponse cancelTimeSlot(@PathVariable("timeSlotId") Long timeSlotId,
+                                           @AuthenticationPrincipal String username) {
+        return service.cancelTimeSlot(timeSlotId, username);
+    }
 }

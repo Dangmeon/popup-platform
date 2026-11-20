@@ -114,4 +114,42 @@ public class PopupStoreController {
 
         return adminReservationService.getReservations(username, popId, status);
     }
+
+    // ------------------- 팝업 중지/재개/종료 메소드
+    @PatchMapping("/api/admin/popups/{popId}/pause")
+    public PopupStoreResponse pausePopup(@PathVariable("popId") Long popId,
+                                         @AuthenticationPrincipal String username) {
+        return service.pausePopup(popId, username);
+    }
+
+    // 팝업 재개
+    @PatchMapping("/api/admin/popups/{popId}/resume")
+    public PopupStoreResponse resumePopup(@PathVariable("popId") Long popId,
+                                          @AuthenticationPrincipal String username) {
+        return service.resumePopup(popId, username);
+    }
+
+    // 팝업 종료 (복구 불가)
+    @PatchMapping("/api/admin/popups/{popId}/cancel")
+    public PopupStoreResponse cancelPopup(@PathVariable("popId") Long popId,
+                                          @AuthenticationPrincipal String username) {
+        return service.cancelPopup(popId, username);
+    }
+
+    /// 테스트 결과 확인된 사항들
+    /// TC-01 : 팝업 중지 >> 200 PAUSE로 잘 바뀌는거 확인 PATCH /api/admin/popups/109/pause
+    /// TC-02 : 팝업 중지된 상태에서 팝업 중지 >> 409 이미 일시 중단된 팝업입니다 PATCH /api/admin/popups/109/pause
+    /// TC-03 : 팝업 재개 >> 200 OPEN으로 잘 바뀌는 거 확인 PATCH /api/admin/popups/109/resume
+    /// TC-04 : 이미 열린 팝업 상태에서 재개시 >> 409 일시 중단 상태인 팝업만 재개할 수 있습니다. PATCH /api/admin/popups/109/resume
+    /// TC-05 : 특정 회차 취소 >> Slot Status == CANCELLED 처리 및 잔여 인원 수 0으로 돌아간 내용 확인 PATCH /api/admin/slots/10/cancel
+    /// TC-06 : 이미 취소된 회차 재취소 시도 >> 이미 취소된 회차입니다. PATCH /api/admin/slots/10/cancel
+    /// TC-07 : 이미 시작 시간이 지난 회차 취소 시도 >> 409 이미 시작된 회차는 취소할 수 없습니다. PATCH /api/admin/slots/11/cancel
+    /// TC-08 : 팝업 영구 종료 및 연쇄 취소 실행 >> 200 CANCELLED로 변경 확인 PATCH /api/admin/popups/110/cancel
+    /// TC-09 : 종료된 팝업 일반 사용자 목록 노출 제외 확인 >> ONGOING만 뜨는거 확인 GET /api/popups | GET /api/popups?status=ONGOING
+    /// TC-10 : 이미 종료된 팝업 중복 종료/중단/재개 시도 >> 세가지 모두 이미 종료(취소)된 팝업입니다.
+    /// TC-11 : 종료된 팝업 기본 정보 수정 차단 >> 종료된 팝업은 수정하거나 하위 회차·상품을 변경할 수 없습니다. PUT /api/admin/popups/100
+    /// TC-12 : 종료된 팝업에 신규 회차 등록 차단 >> 종료된 팝업은 수정하거나 하위 회차·상품을 변경할 수 없습니다. POST /api/admin/popups/100/slots
+    /// TC-13 : 종료된 팝업의 기존 회차 수정 차단 >> 종료된 팝업은 수정하거나 하위 회차·상품을 변경할 수 없습니다.
+    /// TC-14 : 종료된 팝업의 상품 등록/수정/삭제 차단 >> 종료된 팝업은 수정하거나 하위 회차·상품을 변경할 수 없습니다.
+
 }

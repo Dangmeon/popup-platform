@@ -12,6 +12,8 @@ import com.popq.platform.exception.PopupException;
 import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.repository.ProductRepository;
 import com.popq.platform.repository.TimeSlotRepository;
+import com.popq.platform.waiting.entity.WaitingStatus;
+import com.popq.platform.waiting.repository.WaitingQueueRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,15 +29,25 @@ public class PopupStoreService {
 
     PopupStoreRepository popupRepo;
     TimeSlotRepository timeSlotRepo;
+    // -- 대기열 리포 추가
+    WaitingQueueRepository waitingQueueRepo;
+
     ProductRepository productRepo;
     PopupAccessService accessService;
+    // -- 타임슬롯 추가
+    TimeSlotService timeSlotService;
 
     @Autowired
-    public PopupStoreService(PopupStoreRepository popupRepo, TimeSlotRepository timeSlotRepo, ProductRepository productRepo, PopupAccessService accessService) {
+    public PopupStoreService(PopupStoreRepository popupRepo, TimeSlotRepository timeSlotRepo,
+                             ProductRepository productRepo, PopupAccessService accessService,
+                            TimeSlotService timeSlotService, WaitingQueueRepository waitingQueueRepo) {
         this.popupRepo = popupRepo;
         this.timeSlotRepo = timeSlotRepo;
         this.productRepo = productRepo;
         this.accessService = accessService;
+
+        this.timeSlotService = timeSlotService;
+        this.waitingQueueRepo = waitingQueueRepo;
     }
 
     // 전체 팝업 조회
@@ -87,6 +99,9 @@ public class PopupStoreService {
     @Transactional
     public PopupStoreResponse updatePopup(Long popId, PopupStoreRequest request, String username) {
         PopupStore popup = accessService.checkPopupAccess(popId, username); // 없으면 404, 담당이 아니면 403
+
+        popup.validateNotCancelled(); // 취소된 팝업은 수정 불가
+
         checkRequired(request);
         checkPeriod(request);
         checkReservTime(request);
@@ -110,6 +125,47 @@ public class PopupStoreService {
         }
         popupRepo.delete(popup);
     }
+
+    // 팀장 작성 ------------------------- 팝업 중지/재개/종료 메소드 ------------------------
+
+    // 팝업 중지 (OPEN -> PAUSED)
+    @Transactional
+    public PopupStoreResponse pausePopup(Long popId, String username) {
+        PopupStore popup = accessService.checkPopupAccess(popId, username);
+        popup.pause();
+        return PopupStoreResponse.toDto(popup);
+    }
+
+    // 팝업 재개 (PAUSED -> OPEN)
+    @Transactional
+    public PopupStoreResponse resumePopup(Long popId, String username) {
+        PopupStore popup = accessService.checkPopupAccess(popId, username);
+        popup.resume();
+        return PopupStoreResponse.toDto(popup);
+    }
+
+    // 팝업 종료 (복구 불가) : 시작 전 회차·예약·웨이팅 일괄 취소
+    @Transactional
+    public PopupStoreResponse cancelPopup(Long popId, String username) {
+        PopupStore popup = accessService.checkPopupAccess(popId, username);
+        popup.cancel();
+        popupRepo.flush();
+
+        // 시작 전 회차 및 해당 회차 예약 일괄 취소
+        timeSlotService.cancelUpcomingSlotsByPopup(popId);
+
+        // 미입장 웨이팅(WAITING, CALLED) 일괄 취소
+        int cancelledWaitings = waitingQueueRepo.bulkCancelActiveWaitingsByPopup(
+                popId,
+                List.of(WaitingStatus.WAITING, WaitingStatus.CALLED),
+                WaitingStatus.CANCELLED
+        );
+        //log.info("[팝업 종료 연동] popId={} 종료로 인해 미입장 대기열 {}건이 CANCELLED 처리되었습니다.", popId, cancelledWaitings);
+
+        return PopupStoreResponse.toDto(popup);
+    }
+
+    // ------------------------- 팝업 중지/재개/종료 메소드 끝------------------------
 
     // 팝업 상세 조회
     public PopupStoreResponse detailViewPopup(Long popId) {

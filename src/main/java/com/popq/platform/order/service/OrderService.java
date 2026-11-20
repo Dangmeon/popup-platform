@@ -19,6 +19,7 @@ import com.popq.platform.order.repository.OrderRepository;
 import com.popq.platform.repository.ProductRepository;
 import com.popq.platform.repository.UserRepository;
 import com.popq.platform.payment.service.PaymentService;
+import com.popq.platform.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ public class OrderService {
     private final ApplicationEventPublisher eventPublisher;
     private final RedisExpirationKeyService redisExpirationKeyService;
     private final PaymentService paymentService;
+    private final CartService cartService;
 
     // 주문 생성
     @Transactional
@@ -66,9 +68,6 @@ public class OrderService {
             Product product = productRepository.findById(item.getPrdId())
                     .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
 
-            if(!"OPEN".equals(product.getPopupStore().getOpStatus())){
-                throw new OrderException(OrderErrorCode.POPUP_NOT_OPEN);
-            }
 
             productMap.put(item.getPrdId(), product);
 
@@ -133,6 +132,12 @@ public class OrderService {
         // 4. Order 저장
         // cascade로 OrderItem도 같이 저장
         Order savedOrder =  orderRepository.save(order);
+
+        List<Long> orderedPrdIds = request.getItems().stream()
+                        .map(OrderItemRequest::getPrdId)
+                        .toList();
+
+        cartService.removeItemsByProductIds(username, orderedPrdIds);
 
         // 5. TODO Redis TTL 이벤트 발행
         eventPublisher.publishEvent(
@@ -199,14 +204,7 @@ public class OrderService {
         // PENDING 주문 취소 및 재고 복구
         if(order.getOrderStatus() == OrderStatus.PENDING){
 
-            for(OrderItem orderItem : order.getOrderItems()) {
-                int updatedRows = productRepository.increaseStock(
-                            orderItem.getProduct().getPrdId(), orderItem.getQuantity());
-
-                if (updatedRows == 0) {
-                    throw new OrderException(OrderErrorCode.STOCK_RESTORE_FAILED);
-                }
-            }
+            restoreStock(order);
 
             // 주문 상태 CANCELED 변경
             order.cancel();
@@ -223,14 +221,7 @@ public class OrderService {
 
             paymentService.cancelPayment(order);
 
-            for(OrderItem orderItem : order.getOrderItems()) {
-                int updatedRows = productRepository.increaseStock(
-                        orderItem.getProduct().getPrdId(), orderItem.getQuantity());
-
-                if (updatedRows == 0) {
-                    throw new OrderException(OrderErrorCode.STOCK_RESTORE_FAILED);
-                }
-            }
+            restoreStock(order);
 
             order.cancel();
 
@@ -238,5 +229,19 @@ public class OrderService {
         }
 
         throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
+    }
+
+    private void restoreStock(Order order) {
+
+        for (OrderItem orderItem : order.getOrderItems()) {
+            int updatedRows = productRepository.increaseStock(
+                    orderItem.getProduct().getPrdId(),
+                    orderItem.getQuantity()
+            );
+
+            if (updatedRows == 0) {
+                throw new OrderException(OrderErrorCode.STOCK_RESTORE_FAILED);
+            }
+        }
     }
 }

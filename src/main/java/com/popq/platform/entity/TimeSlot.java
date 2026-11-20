@@ -1,6 +1,8 @@
 package com.popq.platform.entity;
 
 import com.popq.platform.dto.TimeSlotRequest;
+import com.popq.platform.exception.TimeSlotErrorCode;
+import com.popq.platform.exception.TimeSlotException;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -96,5 +98,18 @@ public class TimeSlot {
             throw new IllegalStateException("예약 인원이 0명 미만이 될 수 없습니다.");
         }
         this.reservedCount -= count;
+    }
+
+    // 팀장 작성 --------- 이하 슬롯 캔슬 메소드
+
+    public void cancel() {
+        if ("CANCELLED".equals(this.slotStatus)) {
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_ALREADY_CANCELLED); // 이미 취소된 슬롯은 예외 던지기
+        }
+        this.slotStatus = "CANCELLED"; // 취소 상태로 변경
+    }
+
+    public void resetReservedCount() { // 예약 인원수 0으로 초기화하는 메소드
+        this.reservedCount = 0;
     }
 }
