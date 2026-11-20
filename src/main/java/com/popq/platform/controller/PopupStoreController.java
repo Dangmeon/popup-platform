@@ -4,6 +4,9 @@ import com.popq.platform.dto.ManagerResponse;
 import com.popq.platform.dto.PopupManagerRequest;
 import com.popq.platform.dto.PopupStoreRequest;
 import com.popq.platform.dto.PopupStoreResponse;
+import com.popq.platform.reservation.dto.AdminReservationResponse;
+import com.popq.platform.reservation.entity.ReservationStatus;
+import com.popq.platform.reservation.service.AdminReservationService;
 import com.popq.platform.service.PopupStoreService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,10 +18,15 @@ import java.util.List;
 public class PopupStoreController {
 
     PopupStoreService service;
+    AdminReservationService adminReservationService;
 
     @Autowired
-    public PopupStoreController(PopupStoreService service) {
+    public PopupStoreController(
+            PopupStoreService service,
+            AdminReservationService adminReservationService
+    ) {
         this.service = service;
+        this.adminReservationService = adminReservationService;
     }
 
     // 팝업 목록 조회
@@ -96,6 +104,17 @@ public class PopupStoreController {
         return service.assignManager(popId, request, username);
     }
 
+    // 관리자 팝업별 예약 현황 조회
+    @GetMapping("/api/admin/popups/{popId}/reservations")
+    public List<AdminReservationResponse> listAdminReservation(
+            @PathVariable Long popId,
+            @AuthenticationPrincipal String username,
+            @RequestParam(value = "status", required = false)ReservationStatus status
+            ){
+
+        return adminReservationService.getReservations(username, popId, status);
+    }
+
     // ------------------- 팝업 중지/재개/종료 메소드
     @PatchMapping("/api/admin/popups/{popId}/pause")
     public PopupStoreResponse pausePopup(@PathVariable("popId") Long popId,
@@ -132,4 +151,5 @@ public class PopupStoreController {
     /// TC-12 : 종료된 팝업에 신규 회차 등록 차단 >> 종료된 팝업은 수정하거나 하위 회차·상품을 변경할 수 없습니다. POST /api/admin/popups/100/slots
     /// TC-13 : 종료된 팝업의 기존 회차 수정 차단 >> 종료된 팝업은 수정하거나 하위 회차·상품을 변경할 수 없습니다.
     /// TC-14 : 종료된 팝업의 상품 등록/수정/삭제 차단 >> 종료된 팝업은 수정하거나 하위 회차·상품을 변경할 수 없습니다.
+
 }

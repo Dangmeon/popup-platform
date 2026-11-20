@@ -59,6 +59,32 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("statuses") List<ReservationStatus> statuses
     );
 
+    @Query("""
+        select r
+        from Reservation r
+        join r.timeSlot ts
+        join ts.popupStore p
+        where p.popId = :popId
+        order by r.reservedAt desc
+    """)
+    List<Reservation> findByPopupId(
+            @Param("popId") Long popId
+    );
+
+    @Query("""
+        select r
+        from Reservation r
+        join r.timeSlot ts
+        join ts.popupStore p
+        where p.popId = :popId
+            and r.reservationStatus = :status
+        order by r.reservedAt desc
+    """)
+    List<Reservation> findByPopupIdAndStatus(
+            @Param("popId") Long popId,
+            @Param("status") ReservationStatus status
+    );
+
     // 해당 회차에 예약 이력이 하나라도 존재하는지 확인
     boolean existsByTimeSlot_TimeSlotId(Long timeSlotId);
 }
