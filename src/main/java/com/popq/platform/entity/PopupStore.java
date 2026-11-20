@@ -1,6 +1,8 @@
 package com.popq.platform.entity;
 
 import com.popq.platform.dto.PopupStoreRequest;
+import com.popq.platform.exception.PopupErrorCode;
+import com.popq.platform.exception.PopupException;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -106,5 +108,40 @@ public class PopupStore {
     // 담당 매니저 지정 (MANAGER가 팝업을 등록하면 본인으로 지정)
     public void assignManager(User manager) {
         this.manager = manager;
+    }
+
+    // 팀장 작성 --------- 이하 (오픈/중지/취소) 메서드
+
+    public void pause() { // 중지 할 때
+        if ("CANCELLED".equals(this.opStatus)) {
+            throw new PopupException(PopupErrorCode.POPUP_ALREADY_CANCELLED); // 팝업이 이미 취소/닫혀 있으면 예외
+        }
+        if ("PAUSED".equals(this.opStatus)) {
+            throw new PopupException(PopupErrorCode.POPUP_ALREADY_PAUSED); // 팝업이 이미 중지된 상태면 예외
+        }
+        this.opStatus = "PAUSED"; // 나머지 상태일 경우에만 중지 상태로 변경
+    }
+
+    public void resume() { // 재개 할때
+        if ("CANCELLED".equals(this.opStatus)) {
+            throw new PopupException(PopupErrorCode.POPUP_ALREADY_CANCELLED);  // 팝업이 이미 취소/닫혀 있으면 예외
+        }
+        if (!"PAUSED".equals(this.opStatus)) {
+            throw new PopupException(PopupErrorCode.POPUP_NOT_PAUSED);  // 팝업이 중지된 상태가 아니라면 예외
+        }
+        this.opStatus = "OPEN"; // 다시 오픈 상태로 변경
+    }
+
+    public void cancel() { // 캔슬 취소 시킬 때
+        if ("CANCELLED".equals(this.opStatus)) {
+            throw new PopupException(PopupErrorCode.POPUP_ALREADY_CANCELLED); // 이미 취소 된 경우 예외
+        }
+        this.opStatus = "CANCELLED"; // 취소 상태로 변경 (못 되돌림)
+    }
+
+    public void validateNotCancelled() { // 취소된 팝업(굿즈/)은 수정 불가
+        if ("CANCELLED".equals(this.opStatus)) {
+            throw new PopupException(PopupErrorCode.POPUP_CANCELLED_MODIFICATION_DENIED);
+        }
     }
 }

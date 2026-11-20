@@ -3,6 +3,7 @@ package com.popq.platform.waiting.repository;
 import com.popq.platform.waiting.entity.WaitingQueue;
 import com.popq.platform.waiting.entity.WaitingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -78,5 +79,18 @@ public interface WaitingQueueRepository extends JpaRepository<WaitingQueue, Long
     List<WaitingQueue> findExpiredWaitings(
             @Param("status") WaitingStatus status,
             @Param("now") LocalDateTime now
+    );
+
+    // ------------------- 팝업 종료 시 대기열 올 캔슬 메서드
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE WaitingQueue w " +
+            "SET w.waitingStatus = :cancelledStatus " +
+            "WHERE w.popupStore.popId = :popId " +
+            "  AND w.waitingStatus IN :activeStatuses")
+    int bulkCancelActiveWaitingsByPopup(
+            @Param("popId") Long popId,
+            @Param("activeStatuses") java.util.Collection<com.popq.platform.waiting.entity.WaitingStatus> activeStatuses,
+            @Param("cancelledStatus") com.popq.platform.waiting.entity.WaitingStatus cancelledStatus
     );
 }

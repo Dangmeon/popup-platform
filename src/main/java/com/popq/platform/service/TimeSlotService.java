@@ -10,6 +10,8 @@ import com.popq.platform.exception.PopupException;
 import com.popq.platform.exception.TimeSlotErrorCode;
 import com.popq.platform.exception.TimeSlotException;
 import com.popq.platform.repository.PopupStoreRepository;
+import com.popq.platform.reservation.entity.Reservation;
+import com.popq.platform.reservation.entity.ReservationStatus;
 import com.popq.platform.reservation.repository.ReservationRepository;
 import com.popq.platform.repository.TimeSlotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,6 +66,9 @@ public class TimeSlotService {
     public TimeSlotResponse insertTimeSlot(Long popId, TimeSlotRequest request, String username) { // popId는 URL에서 받음
         PopupStore popup = findPopupForUpdate(popId); // 동시에 등록해도 겹치는 회차가 생기지 않도록
         accessService.checkAccess(popup, accessService.getLoginUser(username));
+
+        popup.validateNotCancelled(); // 취소된 팝업에 회차 등록 불가
+
         checkTimeSlot(popup, request);
         if (timeSlotRepo.existsOverlap(
                 popup.getPopId(), request.getSlotDate(), request.getStartTime(), request.getEndTime())) {
@@ -78,6 +84,9 @@ public class TimeSlotService {
     public int generateTimeSlots(Long popId, TimeSlotGenerateRequest request, String username) { // popId는 URL에서 받음
         PopupStore popup = findPopupForUpdate(popId); // 생성 버튼을 두 번 눌러도 회차가 중복 생성되지 않도록
         accessService.checkAccess(popup, accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
+
+        popup.validateNotCancelled(); // 취소된 팝업에 회차 등록 불가
+
         fillDefaults(popup, request);
         checkGenerate(popup, request);
 
@@ -95,6 +104,9 @@ public class TimeSlotService {
         TimeSlot slot = findTimeSlotForUpdate(timeSlotId); // 락 : 수정 중에 예약 인원이 바뀌지 않도록
         PopupStore popup = slot.getPopupStore();
         accessService.checkAccess(popup, accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
+
+        popup.validateNotCancelled(); // 취소된 팝업에 회차 수정 불가
+
         checkTimeSlot(popup, request);
 
         if (reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId)) {
@@ -120,7 +132,11 @@ public class TimeSlotService {
     @Transactional
     public void deleteTimeSlot(Long timeSlotId, String username) {
         TimeSlot slot = findTimeSlotForUpdate(timeSlotId); // 락 : 삭제 중에 예약이 들어오지 않도록
+        PopupStore popup = slot.getPopupStore();
         accessService.checkAccess(slot.getPopupStore(), accessService.getLoginUser(username)); // 담당 팝업이 아니면 403
+
+        popup.validateNotCancelled(); // 취소된 팝업에 회차 삭제 불가
+
         if (reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId)) { // 취소, 만료된 예약도 포함
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_HAS_RESERVATIONS);
         }
@@ -301,6 +317,72 @@ public class TimeSlotService {
         }
         if (popup.getReservEnd() != null && end.compareTo(popup.getReservEnd()) > 0) {
             throw new TimeSlotException(TimeSlotErrorCode.SLOT_TIME_OUT_OF_RESERV_TIME);
+        }
+    }
+
+    // 팀장 수정 ---------------------
+
+    // 단일 회차 취소 공통 메소드 (예약 취소 + 인원 복구 + 회차 상태 변경)
+    @Transactional
+    public void cancelSlotInternal(TimeSlot slot) {
+        if ("CANCELLED".equals(slot.getSlotStatus())) {
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_ALREADY_CANCELLED);
+        }
+        // 해당 회차의 활성화된 예약(HOLD, CONFIRMED) 조회 및 일괄 취소 + 인원 복구
+        List<Reservation> activeReservations = reservationRepo.findActiveReservationsByTimeSlot(
+                slot.getTimeSlotId(),
+                List.of(ReservationStatus.HOLD, ReservationStatus.CONFIRMED)
+        );
+        for (Reservation reservation : activeReservations) {
+            reservation.cancel();
+            slot.decreaseReservedCount(reservation.getPeopleCount());
+        }
+        // 회차 상태 CANCELLED 변경 및 인원수 0으로 초기화
+        slot.resetReservedCount();
+        slot.cancel();
+    }
+
+    // 관리자 개별 회차 취소 API용
+    @Transactional
+    public TimeSlotResponse cancelTimeSlot(Long timeSlotId, String username) {
+        TimeSlot slot = findTimeSlotForUpdate(timeSlotId);
+        PopupStore popup = slot.getPopupStore();
+        accessService.checkAccess(popup, accessService.getLoginUser(username));
+
+        // 이미 시작된 회차인지 검증
+        LocalDate today = LocalDate.now();
+        String nowTime = LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+        if (slot.getSlotDate().isBefore(today)
+                || (slot.getSlotDate().equals(today) && slot.getStartTime().compareTo(nowTime) <= 0)) {
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_ALREADY_STARTED); // 이미 시작된 회차는 캔슬 불가
+        }
+
+        cancelSlotInternal(slot);
+        return TimeSlotResponse.toDto(slot);
+    }
+
+    // 팝업 종료 시 시작 전 회차 일괄 취소용
+    @Transactional
+    public void cancelUpcomingSlotsByPopup(Long popId) {
+        LocalDate today = LocalDate.now();
+        String nowTime = LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+        List<TimeSlot> upcomingSlots = timeSlotRepo.findUpcomingOpenSlots(popId, today, nowTime);
+        for (TimeSlot slot : upcomingSlots) {
+            TimeSlot lockedSlot = findTimeSlotForUpdate(slot.getTimeSlotId());
+            cancelSlotInternal(lockedSlot);
+        }
+    }
+
+    // 스케줄러 - 팝업이 PAUSED 상태일 때 시작 시간이 된 회차 자동 취소 (매 1분마다 실행)
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 * * * * *")
+    @Transactional
+    public void autoCancelPausedStartedSlots() {
+        LocalDate today = LocalDate.now();
+        String nowTime = LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+        List<TimeSlot> targetSlots = timeSlotRepo.findPausedStartedOpenSlots(today, nowTime);
+        for (TimeSlot slot : targetSlots) {
+            TimeSlot lockedSlot = findTimeSlotForUpdate(slot.getTimeSlotId());
+            cancelSlotInternal(lockedSlot);
         }
     }
 }
