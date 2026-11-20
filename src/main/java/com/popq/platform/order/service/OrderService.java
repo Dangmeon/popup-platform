@@ -103,6 +103,19 @@ public class OrderService {
             totalPrice += price;
         }
 
+        UserCoupon userCoupon = null;
+
+        if (request.getUserCouponId() != null) {
+
+            userCoupon = couponService.getValidUserCoupon(username, request.getUserCouponId());
+
+            totalPrice = couponService.calculateDiscountedPrice(
+                    username,
+                    request.getUserCouponId(),
+                    totalPrice
+            );
+        }
+
         // 2. 주문 생성
         LocalDateTime expiresAt = now.plusMinutes(ORDER_EXPIRE_MINUTES);
 
@@ -113,7 +126,8 @@ public class OrderService {
                 request.getReceiverName(),
                 request.getReceiverPhone(),
                 request.getReceiverAddress(),
-                request.getDeliveryMemo()
+                request.getDeliveryMemo(),
+                userCoupon
         );
 
         // 3. OrderItem 생성 + Order에 추가
@@ -121,13 +135,13 @@ public class OrderService {
 
             Product product = productMap.get(item.getPrdId());
 
-            int uniPrice = product.getPrice();
+            int unitPrice = product.getPrice();
             int price = product.getPrice() * item.getQuantity();
 
             OrderItem orderItem = OrderItem.createOrderItem(
                     product,
                     item.getQuantity(),
-                    uniPrice,
+                    unitPrice,
                     price
             );
 

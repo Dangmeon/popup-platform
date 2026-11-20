@@ -96,4 +96,12 @@ public class CouponService {
 
         return userCoupon;
     }
+
+    @Transactional(readOnly = true)
+    public UserCoupon getValidUserCoupon(
+            String username,
+            Long userCouponId
+    ) {
+        return validateAndGetUserCoupon(username, userCouponId);
+    }
 }
