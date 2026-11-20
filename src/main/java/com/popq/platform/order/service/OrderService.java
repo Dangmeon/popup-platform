@@ -1,9 +1,6 @@
 package com.popq.platform.order.service;
 
-import com.popq.platform.order.dto.OrderCreateRequest;
-import com.popq.platform.order.dto.OrderDetailResponse;
-import com.popq.platform.order.dto.OrderItemRequest;
-import com.popq.platform.order.dto.OrderResponse;
+import com.popq.platform.order.dto.*;
 import com.popq.platform.entity.*;
 import com.popq.platform.order.entity.Order;
 import com.popq.platform.order.entity.OrderItem;
@@ -229,6 +226,13 @@ public class OrderService {
         }
 
         throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
+    }
+
+    public List<AdminOrderResponse> getAllOrdersAdmin(){
+        return orderRepository.findAllOrders()
+                .stream()
+                .map(AdminOrderResponse::from)
+                .toList();
     }
 
     private void restoreStock(Order order) {

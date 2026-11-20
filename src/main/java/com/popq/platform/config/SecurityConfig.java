@@ -47,6 +47,8 @@ public class SecurityConfig {
                         // ADMIN과 MANAGER 모두 접근 가능한 관리자 API 경로
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
 
+                        .requestMatchers("/api/admin/orders/**").hasRole("ADMIN")
+
                         // 테스트용 API 등 인증이 필요한 경로 설정
                         .requestMatchers("/api/test").authenticated()
 

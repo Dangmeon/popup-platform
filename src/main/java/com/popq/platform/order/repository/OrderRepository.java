@@ -33,4 +33,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByTossOrderIdForUpdate(
             @Param("tossOrderId") String tossOrderId
     );
+
+    @Query("""
+        SELECT o
+        FROM Order o
+        ORDER BY o.orderedAt DESC
+    """)
+    List<Order> findAllOrders();
 }
