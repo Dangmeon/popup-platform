@@ -56,28 +56,26 @@ public class PopupStoreService {
         this.userRepo = userRepo;
     }
 
-    // 전체 팝업 조회
-    public List<PopupStoreResponse> listAllPopup() {
-        return toDtoList(popupRepo.findAll());
-    }
-
-    // 진행중인 팝업 조회
-    public List<PopupStoreResponse> listOngoingPopup() {
-        return toDtoList(popupRepo.findOngoing(LocalDate.now()));
-    }
-
-    // 카테고리별 팝업 조회
-    public List<PopupStoreResponse> listPopupByCategory(String category) {
-        return toDtoList(popupRepo.findByCategory(category));
-    }
+    // 팝업 카테고리 코드 (2026-11 팀 결정, 기본값 ETC)
+    public static final List<String> CATEGORIES = List.of("FASHION", "CHAR", "ENT", "FOOD", "LIVING", "SPORTS", "ETC");
+    // 진행 상태 (응답의 status 계산값과 같은 기준)
+    public static final List<String> POPUP_STATUSES = List.of("UPCOMING", "ONGOING", "ENDED");
 
     // 사용자 팝업 목록 통합 조회 (status / category / sort=POPULAR + 로그인 회원 찜 여부 / 총 찜 수)
-    public List<PopupStoreResponse> listUserPopups(String username, String status, String category, String sort) {
+    public List<PopupStoreResponse> listUserPopups(String username, String keyword, String status, String category, String sort) {
+        String cleanKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null; // 검색어
         String cleanStatus = (status != null && !status.isBlank()) ? status.trim().toUpperCase() : null;
         String cleanCategory = (category != null && !category.isBlank()) ? category.trim() : null;
         String cleanSort = (sort != null && !sort.isBlank()) ? sort.trim().toUpperCase() : null;
 
-        List<PopupStore> popups = popupRepo.findUserPopups(cleanStatus, cleanCategory, cleanSort, LocalDate.now());
+        if (cleanCategory != null && !CATEGORIES.contains(cleanCategory)) {
+            throw new PopupException(PopupErrorCode.INVALID_CATEGORY);
+        }
+        if (cleanStatus != null && !POPUP_STATUSES.contains(cleanStatus)) {
+            throw new PopupException(PopupErrorCode.INVALID_POPUP_STATUS);
+        }
+
+        List<PopupStore> popups = popupRepo.findUserPopups(cleanKeyword, cleanStatus, cleanCategory, cleanSort, LocalDate.now());
         if (popups.isEmpty()) {
             return List.of();
         }
@@ -127,6 +125,7 @@ public class PopupStoreService {
         checkPeriod(request);
         checkReservTime(request);
         checkNumbers(request); // 예약 정원, 오픈 차수 확인
+        checkCategory(request); // 카테고리 코드 확인
         PopupStore popup = PopupStore.toEntity(null, request);
         User loginUser = accessService.getLoginUser(username);
         if (loginUser.getRole() == Role.MANAGER) {
@@ -147,6 +146,7 @@ public class PopupStoreService {
         checkPeriod(request);
         checkReservTime(request);
         checkNumbers(request); // 예약 정원, 오픈 차수 확인
+        checkCategory(request); // 카테고리 코드 확인
         checkPeriodChange(popup, request); // 기간이 바뀌면 회차, 상품과 충돌하는지 확인
         checkReservTimeChange(popup, request); // 예약 시간이 바뀌면 회차와 충돌하는지 확인
         popup.update(request);
@@ -248,6 +248,14 @@ public class PopupStoreService {
             dtoList.add(PopupStoreResponse.toDto(e));
         }
         return dtoList;
+    }
+
+    // 카테고리 체크 : 비우면(null) 허용 (등록은 ETC, 수정은 기존 값 유지) / 값이 있으면 허용 목록 중 하나
+    // 빈 문자열("")도 막음 : Oracle에서 ""는 NULL이 돼서 저장할 때 에러(409)가 나기 때문
+    private void checkCategory(PopupStoreRequest request) {
+        if (request.getCategory() != null && !CATEGORIES.contains(request.getCategory())) {
+            throw new PopupException(PopupErrorCode.INVALID_CATEGORY);
+        }
     }
 
     // 필수값 체크 : 회차 생성에서 운영기간과 예약 시간을 사용하므로 반드시 필요

@@ -29,18 +29,22 @@ public class PopupStoreController {
         this.adminReservationService = adminReservationService;
     }
 
-    // 팝업 목록 조회
-    // /api/popups                  : 전체
-    // /api/popups?status=ONGOING   : 진행중
-    // /api/popups?category=FASHION : 카테고리별
+    // 팝업 목록 조회 (검색·필터) : 조건은 함께 쓸 수 있고, 비우면 건너뜀 / 종료(CANCELLED)된 팝업은 제외
+    // /api/popups                              : 전체 (시작일 최신순)
+    // /api/popups?keyword=성수                 : 팝업명·장소 검색
+    // /api/popups?category=FOOD                : 카테고리 (FASHION, CHAR, ENT, FOOD, LIVING, SPORTS, ETC)
+    // /api/popups?status=UPCOMING              : 진행 상태 (UPCOMING 오픈 예정, ONGOING 진행 중, ENDED 종료)
+    // /api/popups?sort=POPULAR                 : 찜 많은 순
+    // /api/popups?category=FOOD&status=ONGOING : 조합
     // [회원 연동] 로그인한 회원이면 찜(favorite) 여부를 함께 반환
     @GetMapping("/api/popups")
     public List<PopupStoreResponse> listPopup(
             @AuthenticationPrincipal String username,
+            @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "sort", required = false) String sort) {
-        return service.listUserPopups(username, status, category, sort);
+        return service.listUserPopups(username, keyword, status, category, sort);
     }
 
     // [회원 연동] 로그인한 회원이면 찜(favorite) 여부를 함께 반환

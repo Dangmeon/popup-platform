@@ -12,14 +12,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
-    // 진행중인 팝업 조회 : 시작일 <= 오늘 <= 종료일
-    @Query("SELECT p FROM PopupStore p WHERE p.startDate <= :today AND p.endDate >= :today ORDER BY p.startDate DESC")
-    List<PopupStore> findOngoing(@Param("today") LocalDate today);
-
-    // 카테고리별 조회 (시작일 최신순)
-    @Query("SELECT p FROM PopupStore p WHERE p.category = :category ORDER BY p.startDate DESC")
-    List<PopupStore> findByCategory(@Param("category") String category);
-
     // 관리자 팝업 목록 : 값이 null인 조건은 건너뜀 (managerId null = 전체, keyword null = 검색 안 함, opStatus null = 전체 상태)
     // keyword : LOCATE(찾을 글자, 컬럼) > 0 = 그 글자가 포함되어 있음 (Oracle에서는 INSTR로 바뀜)
     @Query("SELECT p FROM PopupStore p LEFT JOIN p.manager m "
@@ -42,12 +34,18 @@ public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
     @Query("SELECT p FROM PopupStore p WHERE p.opStatus <> 'CANCELLED' ORDER BY p.startDate DESC")
     List<PopupStore> findAllActive();
 
-    // [찜/인기순 연동] 사용자 팝업 목록 통합 조회 (status / category / sort=POPULAR 동시 조합 지원)
+    // [찜/인기순 연동] 사용자 팝업 목록 통합 조회 (keyword / status / category / sort=POPULAR 동시 조합 지원)
+    // keyword : 팝업명·장소에 포함 (LOCATE > 0 = 포함, Oracle에서는 INSTR로 바뀜)
+    // status : UPCOMING(오픈 예정), ONGOING(진행 중), ENDED(종료)
     @Query("""
         SELECT p
         FROM PopupStore p
         WHERE p.opStatus <> 'CANCELLED'
-          AND (:status IS NULL OR :status <> 'ONGOING' OR (p.startDate <= :today AND p.endDate >= :today))
+          AND (:keyword IS NULL OR LOCATE(:keyword, p.title) > 0 OR LOCATE(:keyword, p.location) > 0)
+          AND (:status IS NULL
+               OR (:status = 'UPCOMING' AND p.startDate > :today)
+               OR (:status = 'ONGOING' AND p.startDate <= :today AND p.endDate >= :today)
+               OR (:status = 'ENDED' AND p.endDate < :today))
           AND (:category IS NULL OR p.category = :category)
         ORDER BY
           CASE WHEN :sort = 'POPULAR' THEN (
@@ -57,7 +55,8 @@ public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
           ) END DESC,
           p.startDate DESC
     """)
-    List<PopupStore> findUserPopups(@Param("status") String status,
+    List<PopupStore> findUserPopups(@Param("keyword") String keyword,
+                                    @Param("status") String status,
                                     @Param("category") String category,
                                     @Param("sort") String sort,
                                     @Param("today") LocalDate today);
