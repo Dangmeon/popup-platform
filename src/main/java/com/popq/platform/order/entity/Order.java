@@ -1,6 +1,7 @@
 package com.popq.platform.order.entity;
 
 import com.popq.platform.entity.User;
+import com.popq.platform.entity.UserCoupon;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -52,6 +53,22 @@ public class Order {
     @Column(name = "EXPIRES_AT")
     private LocalDateTime expiresAt;
 
+    @Column(name = "RECEIVER_NAME")
+    private String receiverName;
+
+    @Column(name = "RECEIVER_PHONE")
+    private String receiverPhone;
+
+    @Column(name = "DELIVERY_ADDRESS")
+    private String deliveryAddress;
+
+    @Column(name = "DELIVERY_MEMO")
+    private String deliveryMemo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "USER_COUPON_ID")
+    private UserCoupon userCoupon;
+
     public void completePayment() {
         this.orderStatus = OrderStatus.PAID;
         this.paymentAt = LocalDateTime.now();
@@ -77,7 +94,12 @@ public class Order {
         orderItem.assignOrder(this);
     }
 
-    public static Order createOrder(User user, int totalPrice, LocalDateTime expiresAt){
+    public static Order createOrder(
+            User user, int totalPrice, LocalDateTime expiresAt,
+            String receiverName, String receiverPhone, String deliveryAddress, String deliveryMemo,
+            UserCoupon userCoupon
+    )
+    {
         Order order = new Order();
 
         order.user = user;
@@ -85,6 +107,13 @@ public class Order {
         order.orderStatus = OrderStatus.PENDING;
         order.orderedAt = LocalDateTime.now();
         order.expiresAt = expiresAt;
+
+        order.receiverName = receiverName;
+        order.receiverPhone = receiverPhone;
+        order.deliveryAddress = deliveryAddress;
+        order.deliveryMemo = deliveryMemo;
+
+        order.userCoupon = userCoupon;
 
         order.tossOrderId = UUID.randomUUID()
                 .toString()
