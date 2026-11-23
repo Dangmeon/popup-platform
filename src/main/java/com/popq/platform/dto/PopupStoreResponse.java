@@ -27,10 +27,16 @@ public class PopupStoreResponse {
     private Long managerId;   // 담당 매니저 회원 번호 (없으면 null)
     private String status; // UPCOMING 오픈 예정 / ONGOING 진행중 / ENDED 종료 (계산값)
 
-    // [회원 연동] 로그인 회원의 찜 여부
+    // 로그인 회원의 찜 여부 / 찜 개수 카운트 변수
+    private Boolean isFavorite;
+    private Long favoriteCount;
 
-    // Entity -> Response 변환시 사용
     public static PopupStoreResponse toDto(PopupStore entity) {
+        return toDto(entity, false, 0L);
+    }
+
+    // 사용자 목록/상세 조회용 (찜 여부 + 찜 개수 포함)
+    public static PopupStoreResponse toDto(PopupStore entity, boolean isFavorite, long favoriteCount) {
         return PopupStoreResponse.builder()
                 .popId(entity.getPopId())
                 .title(entity.getTitle())
@@ -47,6 +53,8 @@ public class PopupStoreResponse {
                 .opStatus(entity.getOpStatus())
                 .managerId(entity.getManager() != null ? entity.getManager().getId() : null)
                 .status(getStatus(entity))
+                .isFavorite(isFavorite)
+                .favoriteCount(favoriteCount)
                 .build();
     }
 

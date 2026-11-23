@@ -41,4 +41,24 @@ public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
     // 전체 조회에서 CANCELLED 상태만 제외하고 모두 찾는 쿼리
     @Query("SELECT p FROM PopupStore p WHERE p.opStatus <> 'CANCELLED' ORDER BY p.startDate DESC")
     List<PopupStore> findAllActive();
+
+    // [찜/인기순 연동] 사용자 팝업 목록 통합 조회 (status / category / sort=POPULAR 동시 조합 지원)
+    @Query("""
+        SELECT p
+        FROM PopupStore p
+        WHERE p.opStatus <> 'CANCELLED'
+          AND (:status IS NULL OR :status <> 'ONGOING' OR (p.startDate <= :today AND p.endDate >= :today))
+          AND (:category IS NULL OR p.category = :category)
+        ORDER BY
+          CASE WHEN :sort = 'POPULAR' THEN (
+              SELECT COUNT(f)
+              FROM Favorite f
+              WHERE f.popupStore = p AND f.targetType = 'POPUP'
+          ) END DESC,
+          p.startDate DESC
+    """)
+    List<PopupStore> findUserPopups(@Param("status") String status,
+                                    @Param("category") String category,
+                                    @Param("sort") String sort,
+                                    @Param("today") LocalDate today);
 }

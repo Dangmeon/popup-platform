@@ -36,15 +36,11 @@ public class PopupStoreController {
     // [회원 연동] 로그인한 회원이면 찜(favorite) 여부를 함께 반환
     @GetMapping("/api/popups")
     public List<PopupStoreResponse> listPopup(
+            @AuthenticationPrincipal String username,
             @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "category", required = false) String category) {
-        if ("ONGOING".equals(status)) {
-            return service.listOngoingPopup();
-        }
-        if (category != null) {
-            return service.listPopupByCategory(category);
-        }
-        return service.listAllPopup();
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "sort", required = false) String sort) {
+        return service.listUserPopups(username, status, category, sort);
     }
 
     // [회원 연동] 로그인한 회원이면 찜(favorite) 여부를 함께 반환
@@ -52,8 +48,10 @@ public class PopupStoreController {
 
     // 팝업 상세 조회
     @GetMapping("/api/popups/{popId}")
-    public PopupStoreResponse detailViewPopup(@PathVariable("popId") Long popId) {
-        return service.detailViewPopup(popId);
+    public PopupStoreResponse detailViewPopup(
+            @PathVariable("popId") Long popId,
+            @AuthenticationPrincipal String username) {
+        return service.detailViewPopup(popId, username);
     }
 
     // 아래는 /api/admin/** 관리자 API : @AuthenticationPrincipal = 로그인한 회원 이메일
