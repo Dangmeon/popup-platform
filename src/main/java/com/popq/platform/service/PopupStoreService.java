@@ -9,9 +9,11 @@ import com.popq.platform.entity.Role;
 import com.popq.platform.entity.User;
 import com.popq.platform.exception.PopupErrorCode;
 import com.popq.platform.exception.PopupException;
+import com.popq.platform.favorite.repository.FavoriteRepository;
 import com.popq.platform.repository.PopupStoreRepository;
 import com.popq.platform.repository.ProductRepository;
 import com.popq.platform.repository.TimeSlotRepository;
+import com.popq.platform.repository.UserRepository;
 import com.popq.platform.waiting.entity.WaitingStatus;
 import com.popq.platform.waiting.repository.WaitingQueueRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,8 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Service
 @Transactional(readOnly = true)
@@ -31,6 +32,8 @@ public class PopupStoreService {
     TimeSlotRepository timeSlotRepo;
     // -- 대기열 리포 추가
     WaitingQueueRepository waitingQueueRepo;
+    FavoriteRepository favoriteRepo;
+    UserRepository userRepo;
 
     ProductRepository productRepo;
     PopupAccessService accessService;
@@ -40,14 +43,17 @@ public class PopupStoreService {
     @Autowired
     public PopupStoreService(PopupStoreRepository popupRepo, TimeSlotRepository timeSlotRepo,
                              ProductRepository productRepo, PopupAccessService accessService,
-                            TimeSlotService timeSlotService, WaitingQueueRepository waitingQueueRepo) {
+                            TimeSlotService timeSlotService, WaitingQueueRepository waitingQueueRepo,
+                             FavoriteRepository favoriteRepo,
+                             UserRepository userRepo) {
         this.popupRepo = popupRepo;
         this.timeSlotRepo = timeSlotRepo;
         this.productRepo = productRepo;
         this.accessService = accessService;
-
+        this.favoriteRepo = favoriteRepo;
         this.timeSlotService = timeSlotService;
         this.waitingQueueRepo = waitingQueueRepo;
+        this.userRepo = userRepo;
     }
 
     // 전체 팝업 조회
@@ -63,6 +69,41 @@ public class PopupStoreService {
     // 카테고리별 팝업 조회
     public List<PopupStoreResponse> listPopupByCategory(String category) {
         return toDtoList(popupRepo.findByCategory(category));
+    }
+
+    // 사용자 팝업 목록 통합 조회 (status / category / sort=POPULAR + 로그인 회원 찜 여부 / 총 찜 수)
+    public List<PopupStoreResponse> listUserPopups(String username, String status, String category, String sort) {
+        String cleanStatus = (status != null && !status.isBlank()) ? status.trim().toUpperCase() : null;
+        String cleanCategory = (category != null && !category.isBlank()) ? category.trim() : null;
+        String cleanSort = (sort != null && !sort.isBlank()) ? sort.trim().toUpperCase() : null;
+
+        List<PopupStore> popups = popupRepo.findUserPopups(cleanStatus, cleanCategory, cleanSort, LocalDate.now());
+        if (popups.isEmpty()) {
+            return List.of();
+        }
+
+        // 팝업 ID 목록 추출
+        List<Long> popIds = popups.stream().map(PopupStore::getPopId).toList();
+
+        // 각 팝업별 총 찜 개수 일괄 조회 (N+1 방지)
+        Map<Long, Long> favoriteCountMap = new HashMap<>();
+        for (Object[] row : favoriteRepo.countFavoritesByPopIds(popIds)) {
+            favoriteCountMap.put((Long) row[0], (Long) row[1]);
+        }
+
+        // 로그인한 회원이면 내가 찜한 popId 목록 일괄 조회 (비로그인이면 빈 Set)
+        Set<Long> myFavoritedPopIds = resolveLoginMemberId(username)
+                .map(memberId -> favoriteRepo.findFavoritedPopIds(memberId, popIds))
+                .orElse(Collections.emptySet());
+
+        // DTO 조립
+        List<PopupStoreResponse> result = new ArrayList<>();
+        for (PopupStore p : popups) {
+            boolean isFav = myFavoritedPopIds.contains(p.getPopId());
+            long favCount = favoriteCountMap.getOrDefault(p.getPopId(), 0L);
+            result.add(PopupStoreResponse.toDto(p, isFav, favCount));
+        }
+        return result;
     }
 
     // 관리자 팝업 목록 : ADMIN은 전체, MANAGER는 본인 팝업만 / keyword(팝업명·장소), opStatus 필터, 시작일 최신순
@@ -168,11 +209,16 @@ public class PopupStoreService {
     // ------------------------- 팝업 중지/재개/종료 메소드 끝------------------------
 
     // 팝업 상세 조회
-    public PopupStoreResponse detailViewPopup(Long popId) {
-        // select * from popup_store where pop_id = popId
+    public PopupStoreResponse detailViewPopup(Long popId, String username) {
         PopupStore entity = popupRepo.findById(popId)
                 .orElseThrow(() -> new PopupException(PopupErrorCode.POPUP_NOT_FOUND));
-        return PopupStoreResponse.toDto(entity);
+
+        long favCount = favoriteRepo.countPopupFavorites(popId);
+        boolean isFav = resolveLoginMemberId(username)
+                .map(memberId -> favoriteRepo.isPopupFavorited(memberId, popId))
+                .orElse(false);
+
+        return PopupStoreResponse.toDto(entity, isFav, favCount);
     }
 
     // 매니저 목록 (ADMIN 전용) : 배정 드롭다운용
@@ -289,5 +335,13 @@ public class PopupStoreService {
         if (start != null && end != null && start.compareTo(end) >= 0) {
             throw new PopupException(PopupErrorCode.INVALID_RESERV_TIME_RANGE);
         }
+    }
+
+    // 비로그인일 경우 Optional.empty() 반환
+    private Optional<Long> resolveLoginMemberId(String username) {
+        if (username == null || username.isBlank() || "anonymousUser".equals(username)) {
+            return Optional.empty();
+        }
+        return userRepo.findByUsername(username).map(User::getId);
     }
 }
