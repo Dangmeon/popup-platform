@@ -1,7 +1,7 @@
-package com.popq.platform.repository;
+package com.popq.platform.auth.repository;
 
-import com.popq.platform.entity.Role;
-import com.popq.platform.entity.User;
+import com.popq.platform.auth.entity.Role;
+import com.popq.platform.auth.entity.User;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

@@ -1,9 +1,9 @@
-package com.popq.platform.controller;
+package com.popq.platform.auth.controller;
 
-import com.popq.platform.dto.LoginRequest;
+import com.popq.platform.auth.dto.LoginRequest;
 import com.popq.platform.dto.PasswordFindRequest;
-import com.popq.platform.dto.SignupRequest;
-import com.popq.platform.service.AuthService;
+import com.popq.platform.auth.dto.SignupRequest;
+import com.popq.platform.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

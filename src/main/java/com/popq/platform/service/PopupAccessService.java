@@ -2,12 +2,12 @@ package com.popq.platform.service;
 
 import com.popq.platform.dto.ManagerResponse;
 import com.popq.platform.entity.PopupStore;
-import com.popq.platform.entity.Role;
-import com.popq.platform.entity.User;
+import com.popq.platform.auth.entity.Role;
+import com.popq.platform.auth.entity.User;
 import com.popq.platform.exception.PopupErrorCode;
 import com.popq.platform.exception.PopupException;
 import com.popq.platform.repository.PopupStoreRepository;
-import com.popq.platform.repository.UserRepository;
+import com.popq.platform.auth.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

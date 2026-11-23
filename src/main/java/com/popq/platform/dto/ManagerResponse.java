@@ -1,6 +1,6 @@
 package com.popq.platform.dto;
 
-import com.popq.platform.entity.User;
+import com.popq.platform.auth.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

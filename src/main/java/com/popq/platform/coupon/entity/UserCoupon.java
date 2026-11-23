@@ -1,5 +1,6 @@
-package com.popq.platform.entity;
+package com.popq.platform.coupon.entity;
 
+import com.popq.platform.auth.entity.User;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;

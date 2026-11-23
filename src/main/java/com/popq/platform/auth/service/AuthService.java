@@ -1,12 +1,12 @@
-package com.popq.platform.service;
+package com.popq.platform.auth.service;
 
-import com.popq.platform.config.JwtTokenProvider;
-import com.popq.platform.dto.LoginRequest;
+import com.popq.platform.auth.config.JwtTokenProvider;
+import com.popq.platform.auth.dto.LoginRequest;
+import com.popq.platform.auth.dto.SignupRequest;
+import com.popq.platform.auth.entity.Role;
+import com.popq.platform.auth.entity.User;
+import com.popq.platform.auth.repository.UserRepository;
 import com.popq.platform.dto.PasswordFindRequest;
-import com.popq.platform.dto.SignupRequest;
-import com.popq.platform.entity.Role;
-import com.popq.platform.entity.User;
-import com.popq.platform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -14,31 +14,25 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender javaMailSender;
     private final JwtTokenProvider jwtTokenProvider;
 
-    // 이메일별 인증 코드와 만료 시간을 임시 저장하는 메모리 저장소 (3분 유효)
     private final Map<String, VerificationInfo> verificationStore = new ConcurrentHashMap<>();
 
-    private static class VerificationInfo {
-        String code;
-        LocalDateTime expiryTime;
-
-        public VerificationInfo(String code, LocalDateTime expiryTime) {
-            this.code = code;
-            this.expiryTime = expiryTime;
-        }
+    private record VerificationInfo(String code, LocalDateTime expiryTime) {
     }
 
     @Transactional
@@ -50,7 +44,7 @@ public class AuthService {
         String encodedPassword = passwordEncoder.encode(requestDto.getPassword());
 
         Role userRole = Role.USER;
-        if (requestDto.getRole() != null && requestDto.getRole().trim().toUpperCase().equals("MANAGER")) {
+        if (requestDto.getRole() != null && "MANAGER".equalsIgnoreCase(requestDto.getRole().trim())) {
             userRole = Role.MANAGER;
         }
 
@@ -70,18 +64,18 @@ public class AuthService {
         User user = userRepository.findByUsername(requestDto.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 이메일입니다."));
 
+        if (user.getStatus() == User.UserStatus.WITHDRAWN) {
+            throw new IllegalArgumentException("탈퇴한 회원입니다.");
+        }
+
         if (!passwordEncoder.matches(requestDto.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
-        // role 정보 가져오기 (null 방어 처리)
         String roleName = (user.getRole() != null) ? user.getRole().name() : Role.USER.name();
-
-        // 실제 JWT 토큰 생성 및 반환
         return jwtTokenProvider.createToken(user.getUsername(), roleName);
     }
 
-    // 이메일 + 이름 검증 후 6자리 인증 코드 발송
     public void sendPasswordResetCode(PasswordFindRequest requestDto) {
         User user = userRepository.findByUsername(requestDto.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("가입되지 않은 이메일입니다."));
@@ -90,15 +84,11 @@ public class AuthService {
             throw new IllegalArgumentException("이메일과 이름이 일치하지 않습니다.");
         }
 
-        // 6자리 난수 인증 코드 생성
-        String code = String.format("%06d", new Random().nextInt(1000000));
-
-        // 유효 기간 설정 (3분)
+        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
         LocalDateTime expiryTime = LocalDateTime.now().plusMinutes(3);
 
         verificationStore.put(requestDto.getEmail(), new VerificationInfo(code, expiryTime));
 
-        // 메일 전송
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(requestDto.getEmail());
         message.setSubject("[POPQ 플랫폼] 비밀번호 재설정 인증 코드 안내");
@@ -107,7 +97,6 @@ public class AuthService {
         javaMailSender.send(message);
     }
 
-    // 인증 코드 검증 및 새 비밀번호로 변경
     @Transactional
     public void resetPassword(PasswordFindRequest requestDto) {
         VerificationInfo info = verificationStore.get(requestDto.getEmail());
@@ -116,12 +105,12 @@ public class AuthService {
             throw new IllegalArgumentException("인증 코드를 요청하지 않았거나 만료되었습니다.");
         }
 
-        if (LocalDateTime.now().isAfter(info.expiryTime)) {
+        if (LocalDateTime.now().isAfter(info.expiryTime())) {
             verificationStore.remove(requestDto.getEmail());
             throw new IllegalArgumentException("인증 코드가 만료되었습니다. 다시 요청해 주세요.");
         }
 
-        if (!info.code.equals(requestDto.getCode())) {
+        if (!info.code().equals(requestDto.getCode())) {
             throw new IllegalArgumentException("인증 코드가 일치하지 않습니다.");
         }
 
@@ -130,5 +119,6 @@ public class AuthService {
 
         String encodedPassword = passwordEncoder.encode(requestDto.getNewPassword());
         user.updatePassword(encodedPassword);
+        verificationStore.remove(requestDto.getEmail());
     }
 }

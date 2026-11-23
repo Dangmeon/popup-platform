@@ -1,8 +1,8 @@
-package com.popq.platform.controller;
+package com.popq.platform.auth.controller;
 
-import com.popq.platform.dto.MemberInfoResponse;
-import com.popq.platform.dto.MemberUpdateRequest;
-import com.popq.platform.service.UserService;
+import com.popq.platform.auth.dto.MemberInfoResponse;
+import com.popq.platform.auth.dto.MemberUpdateRequest;
+import com.popq.platform.auth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

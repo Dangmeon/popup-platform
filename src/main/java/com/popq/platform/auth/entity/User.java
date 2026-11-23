@@ -1,4 +1,4 @@
-package com.popq.platform.entity;
+package com.popq.platform.auth.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;

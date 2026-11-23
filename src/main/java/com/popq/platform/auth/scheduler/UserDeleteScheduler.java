@@ -1,7 +1,7 @@
-package com.popq.platform.scheduler;
+package com.popq.platform.auth.scheduler;
 
-import com.popq.platform.entity.User;
-import com.popq.platform.repository.UserRepository;
+import com.popq.platform.auth.entity.User;
+import com.popq.platform.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

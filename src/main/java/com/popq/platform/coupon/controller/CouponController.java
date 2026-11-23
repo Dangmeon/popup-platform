@@ -1,7 +1,7 @@
-package com.popq.platform.controller;
+package com.popq.platform.coupon.controller;
 
-import com.popq.platform.dto.CouponCreateRequest;
-import com.popq.platform.service.CouponService;
+import com.popq.platform.coupon.dto.CouponCreateRequest;
+import com.popq.platform.coupon.service.CouponService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
