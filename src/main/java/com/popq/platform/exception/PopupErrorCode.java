@@ -27,7 +27,9 @@ public enum PopupErrorCode {
     POPUP_CANCELLED_MODIFICATION_DENIED(HttpStatus.CONFLICT, "종료된 팝업은 수정하거나 하위 회차·상품을 변경할 수 없습니다."),
     POPUP_ALREADY_PAUSED(HttpStatus.CONFLICT, "이미 일시 중단된 팝업입니다."),
     POPUP_NOT_PAUSED(HttpStatus.CONFLICT, "일시 중단 상태인 팝업만 재개할 수 있습니다."),
-    POPUP_ALREADY_CANCELLED(HttpStatus.CONFLICT, "이미 종료(취소)된 팝업입니다.");
+    POPUP_ALREADY_CANCELLED(HttpStatus.CONFLICT, "이미 종료(취소)된 팝업입니다."),
+    INVALID_CATEGORY(HttpStatus.BAD_REQUEST, "카테고리는 FASHION, CHAR, ENT, FOOD, LIVING, SPORTS, ETC 중 하나여야 합니다."),
+    INVALID_POPUP_STATUS(HttpStatus.BAD_REQUEST, "진행 상태는 UPCOMING, ONGOING, ENDED 중 하나여야 합니다.");
 
     private final HttpStatus status;
     private final String message;
