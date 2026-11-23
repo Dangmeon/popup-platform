@@ -1,5 +1,6 @@
 package com.popq.platform.controller;
 
+import com.popq.platform.dto.AdminProductResponse;
 import com.popq.platform.dto.ProductRequest;
 import com.popq.platform.dto.ProductResponse;
 import com.popq.platform.service.ProductService;
@@ -31,6 +32,18 @@ public class ProductController {
     }
 
     // 아래는 /api/admin/** 관리자 API : ADMIN은 모든 팝업, MANAGER는 본인 팝업의 상품만 (서비스에서 확인)
+
+    // 관리자 상품 목록
+    // /api/admin/products                 : 전체 (MANAGER는 본인 팝업 상품만)
+    // /api/admin/products?popId=3         : 특정 팝업의 상품
+    // /api/admin/products?keyword=키링     : 상품명 검색
+    @GetMapping("/api/admin/products")
+    public List<AdminProductResponse> listAdminProduct(
+            @AuthenticationPrincipal String username,
+            @RequestParam(value = "popId", required = false) Long popId,
+            @RequestParam(value = "keyword", required = false) String keyword) {
+        return service.listAdminProduct(username, popId, keyword);
+    }
 
     // 상품 등록
     @PostMapping("/api/admin/popups/{popId}/products")

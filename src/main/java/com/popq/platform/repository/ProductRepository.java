@@ -14,6 +14,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p FROM Product p WHERE p.popupStore.popId = :popId ORDER BY p.prdId ASC")
     List<Product> findByPopId(@Param("popId") Long popId);
 
+    // 관리자 상품 목록 : 값이 null인 조건은 건너뜀 (managerId null = 전체, popId null = 모든 팝업, keyword null = 검색 안 함)
+    // JOIN FETCH : 팝업 정보(팝업명, 상태)를 한 번에 같이 가져옴 (상품마다 팝업을 따로 조회하지 않도록)
+    // 정렬 : 팝업 시작일 최신순 -> 같은 팝업 안에서는 상품 등록순
+    @Query("SELECT p FROM Product p JOIN FETCH p.popupStore s LEFT JOIN s.manager m "
+            + "WHERE (:managerId IS NULL OR m.id = :managerId) "
+            + "AND (:popId IS NULL OR s.popId = :popId) "
+            + "AND (:keyword IS NULL OR LOCATE(:keyword, p.productName) > 0) "
+            + "ORDER BY s.startDate DESC, p.prdId ASC")
+    List<Product> findAdminList(@Param("managerId") Long managerId, @Param("popId") Long popId, @Param("keyword") String keyword);
+
     // 팝업에 상품이 하나라도 있는지 (팝업 삭제 전 확인용)
     @Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END FROM Product p WHERE p.popupStore.popId = :popId")
     boolean existsByPopId(@Param("popId") Long popId);

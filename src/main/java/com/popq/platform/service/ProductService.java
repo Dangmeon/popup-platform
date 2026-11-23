@@ -1,5 +1,6 @@
 package com.popq.platform.service;
 
+import com.popq.platform.dto.AdminProductResponse;
 import com.popq.platform.dto.ProductRequest;
 import com.popq.platform.dto.ProductResponse;
 import com.popq.platform.entity.PopupStore;
@@ -50,6 +51,24 @@ public class ProductService {
     // 상품 ID 목록으로 여러 상품 조회 (주문/장바구니 연동용) : 존재하는 상품만 반환
     public List<ProductResponse> listProductByIds(List<Long> prdIds) {
         return toDtoList(productRepo.findAllById(prdIds));
+    }
+
+    // 관리자 상품 목록 : ADMIN은 전체, MANAGER는 본인 팝업의 상품만 / popId(팝업), keyword(상품명) 필터
+    public List<AdminProductResponse> listAdminProduct(String username, Long popId, String keyword) {
+        Long managerId = accessService.getManagerIdForList(username); // ADMIN null, MANAGER 본인 id, 그 외 403
+        if (popId != null) {
+            accessService.checkPopupAccess(popId, username); // 없는 팝업 404, 담당이 아니면 403
+        }
+        if (keyword == null || keyword.isBlank()) { // 빈 검색어는 검색 안 함
+            keyword = null;
+        } else {
+            keyword = keyword.trim();
+        }
+        List<AdminProductResponse> dtoList = new ArrayList<AdminProductResponse>();
+        for (Product e : productRepo.findAdminList(managerId, popId, keyword)) {
+            dtoList.add(AdminProductResponse.toDto(e));
+        }
+        return dtoList;
     }
 
     // 상품 등록 : 등록된 상품 정보 반환
