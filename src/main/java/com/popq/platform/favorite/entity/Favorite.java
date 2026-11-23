@@ -1,7 +1,7 @@
 package com.popq.platform.favorite.entity;
 
-import com.popq.platform.entity.PopupStore;
-import com.popq.platform.entity.User;
+import com.popq.platform.popup.entity.PopupStore;
+import com.popq.platform.auth.entity.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -4,7 +4,7 @@ import com.popq.platform.order.entity.Order;
 import com.popq.platform.order.entity.OrderItem;
 import com.popq.platform.order.entity.OrderStatus;
 import com.popq.platform.order.repository.OrderRepository;
-import com.popq.platform.repository.ProductRepository;
+import com.popq.platform.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -2,12 +2,12 @@ package com.popq.platform.service;
 
 import com.popq.platform.dto.PopupSalesResponse;
 import com.popq.platform.dto.SalesSummaryResponse;
-import com.popq.platform.entity.PopupStore;
+import com.popq.platform.popup.entity.PopupStore;
 import com.popq.platform.auth.entity.Role;
 import com.popq.platform.auth.entity.User;
 import com.popq.platform.order.entity.OrderStatus;
 import com.popq.platform.order.repository.OrderItemRepository;
-import com.popq.platform.repository.PopupStoreRepository;
+import com.popq.platform.popup.repository.PopupStoreRepository;
 import com.popq.platform.repository.SalesSummaryProjection;
 import com.popq.platform.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
