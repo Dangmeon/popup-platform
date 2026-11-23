@@ -41,13 +41,15 @@ public class SecurityConfig {
                         // 회원가입 및 로그인 등 인증 없이 접근해야 하는 경로 허용
                         .requestMatchers("/api/auth/**").permitAll()
 
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/popups/**", "/api/products/**").permitAll()
+
                         // 순수 ADMIN만 접근 가능한 경로
                         .requestMatchers("/api/admin/members/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/orders/**").hasRole("ADMIN")
 
                         // ADMIN과 MANAGER 모두 접근 가능한 관리자 API 경로
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
-
-                        .requestMatchers("/api/admin/orders/**").hasRole("ADMIN")
 
                         // 테스트용 API 등 인증이 필요한 경로 설정
                         .requestMatchers("/api/test").authenticated()
