@@ -1,6 +1,6 @@
-package com.popq.platform.dto;
+package com.popq.platform.auth.dto;
 
-import com.popq.platform.entity.User;
+import com.popq.platform.auth.entity.User;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -9,6 +9,8 @@ import java.time.format.DateTimeFormatter;
 @Getter
 @Builder
 public class MemberInfoResponse {
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
     private Long memberId;
     private String email;
     private String name;
@@ -16,12 +18,10 @@ public class MemberInfoResponse {
     private String role;
     private String createdAt;
 
-
     public static MemberInfoResponse from(User user) {
-        String formattedCreatedAt = "";
-        if (user.getCreatedAt() != null) {
-            formattedCreatedAt = user.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-        }
+        String formattedCreatedAt = user.getCreatedAt() != null
+                ? user.getCreatedAt().format(FORMATTER)
+                : "";
 
         return MemberInfoResponse.builder()
                 .memberId(user.getId())

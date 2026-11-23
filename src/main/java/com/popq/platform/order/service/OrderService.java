@@ -1,5 +1,7 @@
 package com.popq.platform.order.service;
 
+import com.popq.platform.auth.entity.User;
+import com.popq.platform.coupon.entity.UserCoupon;
 import com.popq.platform.order.dto.*;
 import com.popq.platform.entity.*;
 import com.popq.platform.order.entity.Order;
@@ -14,10 +16,10 @@ import com.popq.platform.redis.RedisExpirationKeyService;
 import com.popq.platform.order.repository.OrderItemRepository;
 import com.popq.platform.order.repository.OrderRepository;
 import com.popq.platform.repository.ProductRepository;
-import com.popq.platform.repository.UserRepository;
+import com.popq.platform.auth.repository.UserRepository;
 import com.popq.platform.payment.service.PaymentService;
 import com.popq.platform.service.CartService;
-import com.popq.platform.service.CouponService;
+import com.popq.platform.coupon.service.CouponService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;

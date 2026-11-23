@@ -1,4 +1,4 @@
-package com.popq.platform.config;
+package com.popq.platform.auth.config;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,27 +22,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. Request 헤더에서 토큰 추출
         String token = resolveToken(request);
 
         try {
-            // 2. 토큰 유효성 검사 및 인증 정보 등록
             if (token != null && jwtTokenProvider.validateToken(token)) {
                 String username = jwtTokenProvider.getUsername(token);
                 String role = jwtTokenProvider.getRole(token);
+                String normalizedRole = normalizeRole(role);
 
-                List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+                List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(normalizedRole));
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(username, null, authorities);
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (Exception e) {
-
             logger.error("Could not set user authentication in security context", e);
         }
 
-        // 다음 필터로 넘김
         filterChain.doFilter(request, response);
     }
 
@@ -52,5 +49,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.isBlank()) {
+            return "ROLE_USER";
+        }
+        return role.startsWith("ROLE_") ? role : "ROLE_" + role;
     }
 }

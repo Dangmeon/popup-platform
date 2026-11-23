@@ -1,5 +1,6 @@
 package com.popq.platform.entity;
 
+import com.popq.platform.auth.entity.User;
 import com.popq.platform.dto.PopupStoreRequest;
 import com.popq.platform.exception.PopupErrorCode;
 import com.popq.platform.exception.PopupException;

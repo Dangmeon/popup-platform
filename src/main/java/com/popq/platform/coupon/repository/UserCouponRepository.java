@@ -1,8 +1,8 @@
-package com.popq.platform.repository;
+package com.popq.platform.coupon.repository;
 
-import com.popq.platform.entity.Coupon;
-import com.popq.platform.entity.User;
-import com.popq.platform.entity.UserCoupon;
+import com.popq.platform.coupon.entity.Coupon;
+import com.popq.platform.auth.entity.User;
+import com.popq.platform.coupon.entity.UserCoupon;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserCouponRepository extends JpaRepository<UserCoupon, Long> {

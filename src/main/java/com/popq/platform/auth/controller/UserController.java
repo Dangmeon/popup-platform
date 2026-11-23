@@ -1,6 +1,6 @@
-package com.popq.platform.controller;
+package com.popq.platform.auth.controller;
 
-import com.popq.platform.service.UserService;
+import com.popq.platform.auth.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

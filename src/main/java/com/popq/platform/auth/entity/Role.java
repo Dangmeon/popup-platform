@@ -1,4 +1,4 @@
-package com.popq.platform.entity;
+package com.popq.platform.auth.entity;
 
 public enum Role {
     USER,

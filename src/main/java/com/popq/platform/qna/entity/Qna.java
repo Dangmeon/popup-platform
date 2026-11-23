@@ -1,6 +1,6 @@
 package com.popq.platform.qna.entity;
 
-import com.popq.platform.entity.User;
+import com.popq.platform.auth.entity.User;
 import com.popq.platform.qna.exception.QnaErrorCode;
 import com.popq.platform.qna.exception.QnaException;
 import jakarta.persistence.*;

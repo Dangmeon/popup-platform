@@ -1,4 +1,4 @@
-package com.popq.platform.dto;
+package com.popq.platform.auth.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

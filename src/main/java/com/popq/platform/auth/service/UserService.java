@@ -1,10 +1,13 @@
-package com.popq.platform.service;
+package com.popq.platform.auth.service;
 
-import com.popq.platform.config.JwtTokenProvider;
-import com.popq.platform.dto.*;
-import com.popq.platform.entity.Role;
-import com.popq.platform.entity.User;
-import com.popq.platform.repository.UserRepository;
+import com.popq.platform.auth.config.JwtTokenProvider;
+import com.popq.platform.auth.dto.LoginRequest;
+import com.popq.platform.auth.dto.MemberInfoResponse;
+import com.popq.platform.auth.dto.MemberUpdateRequest;
+import com.popq.platform.auth.dto.SignupRequest;
+import com.popq.platform.auth.entity.Role;
+import com.popq.platform.auth.entity.User;
+import com.popq.platform.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

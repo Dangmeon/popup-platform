@@ -1,4 +1,4 @@
-package com.popq.platform.config;
+package com.popq.platform.auth.config;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;

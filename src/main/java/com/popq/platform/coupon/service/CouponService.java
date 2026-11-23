@@ -1,12 +1,12 @@
-package com.popq.platform.service;
+package com.popq.platform.coupon.service;
 
-import com.popq.platform.dto.CouponCreateRequest;
-import com.popq.platform.entity.Coupon;
-import com.popq.platform.entity.User;
-import com.popq.platform.entity.UserCoupon;
-import com.popq.platform.repository.CouponRepository;
-import com.popq.platform.repository.UserCouponRepository;
-import com.popq.platform.repository.UserRepository;
+import com.popq.platform.coupon.dto.CouponCreateRequest;
+import com.popq.platform.coupon.entity.Coupon;
+import com.popq.platform.auth.entity.User;
+import com.popq.platform.coupon.entity.UserCoupon;
+import com.popq.platform.coupon.repository.CouponRepository;
+import com.popq.platform.coupon.repository.UserCouponRepository;
+import com.popq.platform.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

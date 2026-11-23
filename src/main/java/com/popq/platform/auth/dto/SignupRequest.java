@@ -1,4 +1,4 @@
-package com.popq.platform.dto;
+package com.popq.platform.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

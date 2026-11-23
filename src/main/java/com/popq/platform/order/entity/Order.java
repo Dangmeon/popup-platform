@@ -1,7 +1,7 @@
 package com.popq.platform.order.entity;
 
-import com.popq.platform.entity.User;
-import com.popq.platform.entity.UserCoupon;
+import com.popq.platform.auth.entity.User;
+import com.popq.platform.coupon.entity.UserCoupon;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
