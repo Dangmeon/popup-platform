@@ -60,6 +60,11 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
             + " WHERE t.popupStore.popId = :popId AND t.endTime > :reservEnd")
     boolean existsAfterReservEnd(@Param("popId") Long popId, @Param("reservEnd") String reservEnd);
 
+    // 팝업의 회차 중 예약 이력이 있는 회차 ID 목록 (취소, 만료된 예약도 포함)
+    // 회차 목록에서 회차마다 조회하지 않도록 한 번에 가져옴
+    @Query("SELECT DISTINCT r.timeSlot.timeSlotId FROM Reservation r WHERE r.timeSlot.popupStore.popId = :popId")
+    List<Long> findReservedSlotIdsByPopId(@Param("popId") Long popId);
+
     // [예약 연동] 비관적 락 조회
     // 같은 회차를 동시에 수정하려는 요청은 앞 트랜잭션이 끝날 때까지 대기
     @Lock(LockModeType.PESSIMISTIC_WRITE)

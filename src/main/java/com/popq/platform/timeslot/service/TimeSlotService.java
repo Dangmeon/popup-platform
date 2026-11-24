@@ -54,11 +54,14 @@ public class TimeSlotService {
         } else {
             entityList = timeSlotRepo.findByPopId(popId);
         }
-        return toDtoList(entityList);
+        List<Long> reservedSlotIds = timeSlotRepo.findReservedSlotIdsByPopId(popId); // 예약 이력이 있는 회차 ID
+        return toDtoList(entityList, reservedSlotIds);
     }
 
     public TimeSlotResponse detailTimeSlot(Long timeSlotId) {
-        return TimeSlotResponse.toDto(findTimeSlot(timeSlotId));
+        TimeSlot slot = findTimeSlot(timeSlotId); // 없는 회차면 404
+        boolean hasHistory = reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId); // 취소, 만료된 예약도 포함
+        return TimeSlotResponse.toDto(slot, hasHistory);
     }
 
     // 회차 1개 등록 : 등록된 회차 정보 반환
@@ -75,7 +78,7 @@ public class TimeSlotService {
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_OVERLAP);
         }
         TimeSlot saved = timeSlotRepo.save(TimeSlot.toEntity(null, popup, request, 0));
-        return TimeSlotResponse.toDto(saved); // timeSlotId 대신 회차 정보 전체 반환
+        return TimeSlotResponse.toDto(saved, false); // 새로 만든 회차라 예약 이력 없음
     }
 
     // 자동 생성 : 생성된 개수 반환
@@ -108,8 +111,9 @@ public class TimeSlotService {
         popup.validateNotCancelled(); // 취소된 팝업에 회차 수정 불가
 
         checkTimeSlot(popup, request);
+        boolean hasHistory = reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId); // 아래 응답에서도 사용
 
-        if (reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId)) {
+        if (hasHistory) {
             boolean changed = !slot.getSlotDate().equals(request.getSlotDate())
                     || !slot.getStartTime().equals(request.getStartTime())
                     || !slot.getEndTime().equals(request.getEndTime());
@@ -125,7 +129,7 @@ public class TimeSlotService {
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_OVERLAP);
         }
         slot.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE (예약 인원은 그대로)
-        return TimeSlotResponse.toDto(slot);
+        return TimeSlotResponse.toDto(slot, hasHistory);
     }
 
     // 예약이 있거나 예약 이력이 있으면 삭제 불가
@@ -171,10 +175,11 @@ public class TimeSlotService {
                 .orElseThrow(() -> new TimeSlotException(TimeSlotErrorCode.TIMESLOT_NOT_FOUND));
     }
 
-    private List<TimeSlotResponse> toDtoList(List<TimeSlot> entityList) {
+    private List<TimeSlotResponse> toDtoList(List<TimeSlot> entityList, List<Long> reservedSlotIds) {
         List<TimeSlotResponse> dtoList = new ArrayList<TimeSlotResponse>();
         for (TimeSlot e : entityList) {
-            dtoList.add(TimeSlotResponse.toDto(e));
+            boolean hasHistory = reservedSlotIds.contains(e.getTimeSlotId());
+            dtoList.add(TimeSlotResponse.toDto(e, hasHistory));
         }
         return dtoList;
     }
@@ -358,7 +363,8 @@ public class TimeSlotService {
         }
 
         cancelSlotInternal(slot);
-        return TimeSlotResponse.toDto(slot);
+        boolean hasHistory = reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId);
+        return TimeSlotResponse.toDto(slot, hasHistory);
     }
 
     // 팝업 종료 시 시작 전 회차 일괄 취소용
