@@ -7,7 +7,7 @@ import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.popq.platform.auth.entity.User;
 import com.popq.platform.timeslot.dto.TimeSlotChangedEvent;
-import com.popq.platform.redis.RedisExpirationKeyService;
+import com.popq.platform.common.redis.RedisExpirationKeyService;
 import com.popq.platform.reservation.dto.ReservationCreateRequest;
 import com.popq.platform.reservation.dto.ReservationDetailResponse;
 import com.popq.platform.reservation.dto.ReservationResponse;

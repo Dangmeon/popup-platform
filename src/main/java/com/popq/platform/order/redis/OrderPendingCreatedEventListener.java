@@ -1,7 +1,7 @@
 package com.popq.platform.order.redis;
 
 import com.popq.platform.order.event.OrderPendingCreatedEvent;
-import com.popq.platform.redis.RedisExpirationKeyService;
+import com.popq.platform.common.redis.RedisExpirationKeyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

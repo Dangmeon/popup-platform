@@ -1,6 +1,6 @@
 package com.popq.platform.reservation.redis;
 
-import com.popq.platform.redis.RedisExpirationKeyService;
+import com.popq.platform.common.redis.RedisExpirationKeyService;
 import com.popq.platform.reservation.event.ReservationHoldCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
