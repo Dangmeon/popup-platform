@@ -24,6 +24,7 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Service
@@ -153,8 +154,13 @@ public class PaymentService {
     }
 
     private void validatePayment(Order order, PaymentRequest request) {
+
         if (order.getOrderStatus() != OrderStatus.PENDING) {
             throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        if(!LocalDateTime.now().isBefore(order.getExpiresAt())){
+            throw new OrderException(OrderErrorCode.ORDER_EXPIRED);
         }
 
         if (order.getTotalPrice() != request.getAmount()) {
@@ -163,6 +169,7 @@ public class PaymentService {
     }
 
     private void validateCancelablePayment(Payment payment) {
+
         if (payment.getPaymentStatus() != PaymentStatus.PAID) {
             throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
         }

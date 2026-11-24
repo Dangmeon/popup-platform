@@ -18,6 +18,8 @@ import com.popq.platform.reservation.exception.ReservationErrorCode;
 import com.popq.platform.reservation.exception.ReservationException;
 import com.popq.platform.reservation.redis.ReservationExpirationService;
 import com.popq.platform.reservation.repository.ReservationRepository;
+import com.popq.platform.timeslot.exception.TimeSlotErrorCode;
+import com.popq.platform.timeslot.exception.TimeSlotException;
 import com.popq.platform.timeslot.repository.TimeSlotRepository;
 import com.popq.platform.auth.repository.UserRepository;
 import com.popq.platform.reservation.event.ReservationHoldCreatedEvent;
@@ -429,6 +431,9 @@ public class ReservationService {
     @Transactional
     public void cancelAllBySlot(Long timeSlotId){
 
+        TimeSlot timeSlot = timeSlotRepository.findByIdForUpdate(timeSlotId)
+                .orElseThrow(() -> new TimeSlotException(TimeSlotErrorCode.TIMESLOT_NOT_FOUND));
+
         List<Reservation> reservations = reservationRepository.findActiveReservationsByTimeSlot(
                 timeSlotId,
                 List.of(ReservationStatus.HOLD, ReservationStatus.CONFIRMED)
@@ -444,6 +449,8 @@ public class ReservationService {
 
             reservation.cancel();
         }
+
+        timeSlot.resetReservedCount();
     }
 
     private Reservation getReservation(Long reservationId){
