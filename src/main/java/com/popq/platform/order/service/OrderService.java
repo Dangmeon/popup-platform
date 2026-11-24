@@ -127,7 +127,8 @@ public class OrderService {
                 expiresAt,
                 request.getReceiverName(),
                 request.getReceiverPhone(),
-                request.getReceiverAddress(),
+                request.getDeliveryAddress(),
+                request.getDeliveryAddressDetail(),
                 request.getDeliveryMemo(),
                 userCoupon
         );
@@ -265,6 +266,15 @@ public class OrderService {
                 .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
         return AdminOrderDetailResponse.from(order);
+    }
+
+    @Transactional(readOnly = true)
+    public RecentDeliveryResponse getRecentDelivery(String username) {
+
+        Order order = orderRepository.findTopByUserUsernameOrderByOrderedAtDesc(username)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        return RecentDeliveryResponse.from(order);
     }
 
     private void restoreStock(Order order) {
