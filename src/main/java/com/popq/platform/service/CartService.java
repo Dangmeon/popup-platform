@@ -2,10 +2,11 @@ package com.popq.platform.service;
 
 import com.popq.platform.dto.CartRequest;
 import com.popq.platform.dto.CartResponse;
-import com.popq.platform.dto.ProductResponse;
+import com.popq.platform.product.dto.ProductResponse;
 import com.popq.platform.entity.Cart;
 import com.popq.platform.auth.entity.User;
 import com.popq.platform.exception.CartException;
+import com.popq.platform.product.service.ProductService;
 import com.popq.platform.repository.CartMemberRepository;
 import com.popq.platform.repository.CartPurchaseHistoryRepository;
 import com.popq.platform.repository.CartRepository;

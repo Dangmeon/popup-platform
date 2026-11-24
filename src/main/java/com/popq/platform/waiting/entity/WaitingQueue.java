@@ -1,7 +1,6 @@
 package com.popq.platform.waiting.entity;
 
-import com.popq.platform.entity.PopupStore;
-import com.popq.platform.waiting.entity.WaitingStatus;
+import com.popq.platform.popup.entity.PopupStore;
 import com.popq.platform.waiting.exception.WaitingErrorCode;
 import com.popq.platform.waiting.exception.WaitingException;
 import jakarta.persistence.*;

@@ -1,9 +1,13 @@
 package com.popq.platform.exception;
 
+import com.popq.platform.image.exception.ImageErrorCode;
+import com.popq.platform.image.exception.ImageException;
+import com.popq.platform.popup.exception.PopupException;
 import com.popq.platform.qna.exception.QnaErrorCode;
 import com.popq.platform.qna.exception.QnaException;
 import com.popq.platform.order.exception.OrderException;
 import com.popq.platform.reservation.exception.ReservationException;
+import com.popq.platform.timeslot.exception.TimeSlotException;
 import com.popq.platform.waiting.exception.WaitingErrorCode;
 import com.popq.platform.waiting.exception.WaitingException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -86,8 +90,8 @@ public class GlobalExceptionHandler {
     }
 
     // 상품 에러 처리
-    @ExceptionHandler(ProductException.class)
-    public ResponseEntity<Map<String, String>> handleProductException(ProductException ex) {
+    @ExceptionHandler(com.popq.platform.product.exception.exception.ProductException.class)
+    public ResponseEntity<Map<String, String>> handleProductException(com.popq.platform.product.exception.exception.ProductException ex) {
         Map<String, String> error = new HashMap<>();
 
         error.put("code", ex.getErrorCode().name());
