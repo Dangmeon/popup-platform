@@ -1,7 +1,7 @@
 package com.popq.platform.auth.controller;
 
 import com.popq.platform.auth.dto.LoginRequest;
-import com.popq.platform.dto.PasswordFindRequest;
+import com.popq.platform.common.dto.PasswordFindRequest;
 import com.popq.platform.auth.dto.SignupRequest;
 import com.popq.platform.auth.service.AuthService;
 import jakarta.validation.Valid;

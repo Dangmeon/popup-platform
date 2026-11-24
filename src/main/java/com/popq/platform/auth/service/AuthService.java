@@ -6,7 +6,7 @@ import com.popq.platform.auth.dto.SignupRequest;
 import com.popq.platform.auth.entity.Role;
 import com.popq.platform.auth.entity.User;
 import com.popq.platform.auth.repository.UserRepository;
-import com.popq.platform.dto.PasswordFindRequest;
+import com.popq.platform.common.dto.PasswordFindRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
