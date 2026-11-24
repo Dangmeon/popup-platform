@@ -1,0 +1,90 @@
+package com.popq.platform.reservation.repository;
+
+import com.popq.platform.reservation.entity.Reservation;
+import com.popq.platform.reservation.entity.ReservationStatus;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+public interface ReservationRepository extends JpaRepository<Reservation, Long> {
+
+    @Query("""
+        SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END
+        FROM Reservation r
+        WHERE r.user.id = :memberId
+            AND r.timeSlot.timeSlotId = :timeSlotId
+            AND r.reservationStatus IN :statuses
+    """)
+    boolean existsActiveReservation(
+            @Param("memberId") Long memberId,
+            @Param("timeSlotId") Long timeSlotId,
+            @Param("statuses") List<ReservationStatus> statuses
+    );
+
+    @Query("""
+        SELECT r
+        FROM Reservation r
+        WHERE r.reservationStatus = :status
+            AND r.expiresAt <= :now
+    """)
+    List<Reservation> findExpiredReservations(
+            @Param("status") ReservationStatus status,
+            @Param("now") LocalDateTime now
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT r
+            FROM Reservation r
+            WHERE r.reservationId = :reservationId
+    """)
+    Optional<Reservation> findByIdForUpdate(
+            @Param("reservationId") Long reservationId
+    );
+
+    @Query("""
+        SELECT r
+        FROM Reservation r
+        WHERE r.timeSlot.timeSlotId = :timeSlotId
+            AND r.reservationStatus IN :statuses
+    """)
+    List<Reservation> findActiveReservationsByTimeSlot(
+            @Param("timeSlotId") Long timeSlotId,
+            @Param("statuses") List<ReservationStatus> statuses
+    );
+
+    @Query("""
+        select r
+        from Reservation r
+        join r.timeSlot ts
+        join ts.popupStore p
+        where p.popId = :popId
+        order by r.reservedAt desc
+    """)
+    List<Reservation> findByPopupId(
+            @Param("popId") Long popId
+    );
+
+    @Query("""
+        select r
+        from Reservation r
+        join r.timeSlot ts
+        join ts.popupStore p
+        where p.popId = :popId
+            and r.reservationStatus = :status
+        order by r.reservedAt desc
+    """)
+    List<Reservation> findByPopupIdAndStatus(
+            @Param("popId") Long popId,
+            @Param("status") ReservationStatus status
+    );
+
+    // 해당 회차에 예약 이력이 하나라도 존재하는지 확인
+    boolean existsByTimeSlot_TimeSlotId(Long timeSlotId);
+}
