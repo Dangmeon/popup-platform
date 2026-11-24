@@ -1,7 +1,7 @@
 package com.popq.platform.qna.service;
 
-import com.popq.platform.entity.Role;
-import com.popq.platform.entity.User;
+import com.popq.platform.auth.entity.Role;
+import com.popq.platform.auth.entity.User;
 import com.popq.platform.qna.dto.QnaAnswerRequest;
 import com.popq.platform.qna.dto.QnaCreateRequest;
 import com.popq.platform.qna.dto.QnaResponse;
@@ -11,11 +11,10 @@ import com.popq.platform.qna.entity.QnaStatus;
 import com.popq.platform.qna.exception.QnaErrorCode;
 import com.popq.platform.qna.exception.QnaException;
 import com.popq.platform.qna.repository.QnaRepository;
-import com.popq.platform.repository.UserRepository;
+import com.popq.platform.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
