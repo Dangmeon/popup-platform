@@ -1,10 +1,13 @@
 package com.popq.platform.payment.service;
 
+import com.popq.platform.order.exception.OrderErrorCode;
+import com.popq.platform.order.exception.OrderException;
 import com.popq.platform.payment.dto.PaymentRequest;
 import com.popq.platform.payment.dto.PaymentResponse;
 import com.popq.platform.order.entity.Order;
 import com.popq.platform.order.entity.OrderStatus;
 import com.popq.platform.payment.entity.Payment;
+import com.popq.platform.payment.entity.PaymentStatus;
 import com.popq.platform.payment.exception.PaymentErrorCode;
 import com.popq.platform.payment.exception.PaymentException;
 import com.popq.platform.common.redis.RedisExpirationKeyService;
@@ -20,7 +23,6 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
@@ -33,7 +35,6 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final RedisExpirationKeyService redisExpirationKeyService;
     private final RestClient restClient;
-    private final ObjectMapper objectMapper;
     private final CouponService couponService;
 
     @Value("${toss.secret-key}")
@@ -42,24 +43,13 @@ public class PaymentService {
     @Transactional
     public PaymentResponse confirmPayment(PaymentRequest request) {
 
-        System.out.println("paymentKey = " + request.getPaymentKey());
-        System.out.println("orderId = [" + request.getOrderId() + "]");
-        System.out.println("amount = " + request.getAmount());
+        Order order = getOrderForUpdate(request.getOrderId());
 
-        Order order = orderRepository.findByTossOrderIdForUpdate(request.getOrderId())
-                .orElseThrow(() -> new IllegalArgumentException("주문이 없다."));
-
-        if (order.getOrderStatus() != OrderStatus.PENDING) {
-            throw new IllegalStateException("결제할 수 없는 주문 상태입니다.");
-        }
-
-        if(order.getTotalPrice() != request.getAmount()){
-            throw new IllegalArgumentException("결제 금액이 일치하지 않습니다.");
-        }
+        validatePayment(order, request);
 
         approveTossPayment(request);
 
-        Payment payment = Payment.createPayment(
+        Payment payment = Payment.create(
                 order,
                 request.getPaymentKey(),
                 request.getAmount()
@@ -88,6 +78,8 @@ public class PaymentService {
 
         Payment payment = paymentRepository.findByOrder_OrderId(order.getOrderId())
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+        validateCancelablePayment(payment);
 
         cancelTossPayment(payment.getPaymentKey());
 
@@ -121,38 +113,58 @@ public class PaymentService {
         }
     }
 
-private void cancelTossPayment(String paymentKey) {
+    private void cancelTossPayment(String paymentKey) {
 
-    Map<String, String> body = Map.of(
-            "cancelReason", "고객 요청"
-    );
+        Map<String, String> body = Map.of(
+                "cancelReason", "고객 요청"
+        );
 
-    try {
-        restClient.post()
-                .uri(
-                        "https://api.tosspayments.com/v1/payments/{paymentKey}/cancel",
-                        paymentKey
-                )
-                .headers(headers ->
-                        headers.setBasicAuth(tossSecretKey, "")
-                )
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(body)
-                .retrieve()
-                .toBodilessEntity();
+        try {
+            restClient.post()
+                    .uri(
+                            "https://api.tosspayments.com/v1/payments/{paymentKey}/cancel",
+                            paymentKey
+                    )
+                    .headers(headers ->
+                            headers.setBasicAuth(tossSecretKey, "")
+                    )
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
 
-    } catch (HttpClientErrorException e) {
+        } catch (HttpClientErrorException e) {
 
-        throw new PaymentException(PaymentErrorCode.TOSS_CANCEL_FAILED);
+            throw new PaymentException(PaymentErrorCode.TOSS_CANCEL_FAILED);
 
-    } catch (HttpServerErrorException e) {
+        } catch (HttpServerErrorException e) {
 
-        throw new PaymentException(PaymentErrorCode.TOSS_SERVER_ERROR);
+            throw new PaymentException(PaymentErrorCode.TOSS_SERVER_ERROR);
 
-    } catch (RestClientException e) {
+        } catch (RestClientException e) {
 
-        throw new PaymentException(PaymentErrorCode.PAYMENT_CONNECTION_ERROR);
+            throw new PaymentException(PaymentErrorCode.PAYMENT_CONNECTION_ERROR);
+        }
     }
-}
 
+    private Order getOrderForUpdate(String tossOrderId) {
+        return orderRepository.findByTossOrderIdForUpdate(tossOrderId)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+    }
+
+    private void validatePayment(Order order, PaymentRequest request) {
+        if (order.getOrderStatus() != OrderStatus.PENDING) {
+            throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        if (order.getTotalPrice() != request.getAmount()) {
+            throw new PaymentException(PaymentErrorCode.AMOUNT_MISMATCH);
+        }
+    }
+
+    private void validateCancelablePayment(Payment payment) {
+        if (payment.getPaymentStatus() != PaymentStatus.PAID) {
+            throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
+        }
+    }
 }
