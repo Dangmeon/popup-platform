@@ -1,16 +1,14 @@
 package com.popq.platform.order.repository;
 
-import com.popq.platform.order.entity.Order;
 import com.popq.platform.order.entity.OrderItem;
 import com.popq.platform.order.entity.OrderStatus;
-import com.popq.platform.repository.SalesSummaryProjection;
+import com.popq.platform.sales.repository.SalesSummaryProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
