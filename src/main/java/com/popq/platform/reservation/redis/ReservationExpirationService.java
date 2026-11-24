@@ -7,6 +7,8 @@ import com.popq.platform.timeslot.entity.TimeSlot;
 import com.popq.platform.reservation.exception.ReservationErrorCode;
 import com.popq.platform.reservation.exception.ReservationException;
 import com.popq.platform.reservation.repository.ReservationRepository;
+import com.popq.platform.timeslot.exception.TimeSlotErrorCode;
+import com.popq.platform.timeslot.exception.TimeSlotException;
 import com.popq.platform.timeslot.repository.TimeSlotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -39,7 +41,7 @@ public class ReservationExpirationService {
 
         Long timeSlotId = reservation.getTimeSlot().getTimeSlotId();
         TimeSlot timeSlot = timeSlotRepository.findByIdForUpdate(timeSlotId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 회차가 없습니다."));
+                .orElseThrow(() -> new TimeSlotException(TimeSlotErrorCode.TIMESLOT_NOT_FOUND));
 
         timeSlot.decreaseReservedCount(reservation.getPeopleCount());
 

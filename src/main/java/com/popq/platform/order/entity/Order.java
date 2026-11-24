@@ -3,6 +3,7 @@ package com.popq.platform.order.entity;
 import com.popq.platform.auth.entity.User;
 import com.popq.platform.coupon.entity.UserCoupon;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -13,7 +14,7 @@ import java.util.UUID;
 
 @Entity
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "ORDERS")
 public class Order {
 

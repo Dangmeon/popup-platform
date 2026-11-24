@@ -25,7 +25,7 @@ public record ReservationDetailResponse(
         String popupImage
 ) {
 
-    public static ReservationDetailResponse fromDetailReservation(Reservation reservation) {
+    public static ReservationDetailResponse from(Reservation reservation) {
         TimeSlot timeSlot = reservation.getTimeSlot();
         PopupStore popupStore = timeSlot.getPopupStore();
 

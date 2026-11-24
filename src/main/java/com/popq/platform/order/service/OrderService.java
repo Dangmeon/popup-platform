@@ -30,7 +30,6 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class OrderService {
 
     private static final int ORDER_EXPIRE_MINUTES = 10;
@@ -59,37 +58,28 @@ public class OrderService {
         // 조회한 상품 재사용
         Map<Long, Product> productMap = new HashMap<>();
 
+        List<OrderItemRequest> items = request.getItems().stream()
+                .sorted(Comparator.comparing(OrderItemRequest::getPrdId))
+                .toList();
+
         // 1. 상품 검증 + 재고 차감 + 총 금액 계산
-        for (OrderItemRequest item : request.getItems()) {
+        for (OrderItemRequest item : items) {
             // 수량 검증
-            if (item.getQuantity() == null || item.getQuantity() <= 0) {
-                throw new OrderException(OrderErrorCode.INVALID_QUANTITY);
-            }
+            validateQuantity(item.getQuantity());
 
-            Product product = productRepository.findById(item.getPrdId())
-                    .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
-
+            Product product = getProduct(item.getPrdId());
 
             productMap.put(item.getPrdId(), product);
 
-            // 판매 기간 검증
-            if (product.getSaleStart() != null && now.isBefore(product.getSaleStart())) {
-                throw new OrderException(OrderErrorCode.SALE_NOT_STARTED);
+            if (!"OPEN".equals(product.getPopupStore().getOpStatus())) {
+                throw new OrderException(OrderErrorCode.POPUP_NOT_OPEN);
             }
 
-            if (product.getSaleEnd() != null && now.isAfter(product.getSaleEnd())) {
-                throw new OrderException(OrderErrorCode.SALE_ENDED);
-            }
+            // 판매 기간 검증
+            validateSalePeriod(product, now);
 
             // 1인 구매 제한 검증
-            int purchaseQuantity = orderItemRepository.sumPurchasedQuantity(
-                    user.getId(), item.getPrdId(), List.of(OrderStatus.PENDING, OrderStatus.PAID));
-
-            if (purchaseQuantity + item.getQuantity() > product.getMaxQty()) {
-                throw new OrderException(
-                        OrderErrorCode.PURCHASE_LIMIT_EXCEEDED,
-                        "해당 상품은 1인당 최대 " + product.getMaxQty() + "개까지 구매할 수 있습니다.");
-            }
+            validatePurchaseLimit(user, product, item.getQuantity());
 
             // 재고 차감
             int updatedRows = productRepository.decreaseStock(
@@ -134,7 +124,7 @@ public class OrderService {
         );
 
         // 3. OrderItem 생성 + Order에 추가
-        for (OrderItemRequest item : request.getItems()) {
+        for (OrderItemRequest item : items) {
 
             Product product = productMap.get(item.getPrdId());
 
@@ -176,8 +166,7 @@ public class OrderService {
     // 내 주문 목록 조회
     public List<OrderResponse> getMyOrders(String username) {
         // 회원별 주문 조회
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
+        User user = getUser(username);
 
         List<Order> orders = orderRepository.findByMemberId(user.getId());
 
@@ -190,13 +179,10 @@ public class OrderService {
     // 주문 상세 조회
     public OrderDetailResponse getOrderDetail(String username, Long orderId) {
         // 주문 존재 여부 확인
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+        Order order = getOrder(orderId);
 
         // 본인 주문 여부 확인
-        if (!order.getUser().getUsername().equals(username)) {
-            throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
-        }
+        validateOrderOwner(order, username);
 
         // 주문 상품 조회 및 DTO 변환
         return OrderDetailResponse.from(order);
@@ -210,9 +196,7 @@ public class OrderService {
                 .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
         // 본인 주문 여부 확인
-        if (!order.getUser().getUsername().equals(username)) {
-            throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
-        }
+        validateOrderOwner(order, username);
 
         // 취소 가능한 주문 상태인지 확인
         if (order.getOrderStatus() == OrderStatus.CANCELLED) {
@@ -262,8 +246,7 @@ public class OrderService {
 
     public AdminOrderDetailResponse getAdminOrderDetail(Long orderId) {
 
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+        Order order = getOrder(orderId);
 
         return AdminOrderDetailResponse.from(order);
     }
@@ -288,6 +271,60 @@ public class OrderService {
             if (updatedRows == 0) {
                 throw new OrderException(OrderErrorCode.STOCK_RESTORE_FAILED);
             }
+        }
+    }
+
+    private User getUser(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
+    }
+
+    private Product getProduct(Long prdId) {
+        return productRepository.findById(prdId)
+                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
+    }
+
+    private Order getOrder(Long orderId) {
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+
+    }
+
+    private void validateOrderOwner(Order order, String username) {
+
+        if (!order.getUser().getUsername().equals(username)) {
+            throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+    }
+
+    private void validateQuantity(Integer quantity) {
+
+        if (quantity == null || quantity <= 0) {
+            throw new OrderException(OrderErrorCode.INVALID_QUANTITY);
+        }
+    }
+
+    private void validateSalePeriod(Product product, LocalDateTime now) {
+
+        if (product.getSaleStart() != null && now.isBefore(product.getSaleStart())) {
+            throw new OrderException(OrderErrorCode.SALE_NOT_STARTED);
+        }
+
+        if (product.getSaleEnd() != null && now.isAfter(product.getSaleEnd())) {
+            throw new OrderException(OrderErrorCode.SALE_ENDED);
+        }
+    }
+
+    private void validatePurchaseLimit(User user, Product product, Integer quantity) {
+
+        int purchaseQuantity = orderItemRepository.sumPurchasedQuantity(
+                user.getId(), product.getPrdId(), List.of(OrderStatus.PENDING, OrderStatus.PAID));
+
+        if (purchaseQuantity + quantity > product.getMaxQty()) {
+            throw new OrderException(
+                    OrderErrorCode.PURCHASE_LIMIT_EXCEEDED,
+                    "해당 상품은 1인당 최대 " + product.getMaxQty() + "개까지 구매할 수 있습니다."
+            );
         }
     }
 }

@@ -14,7 +14,7 @@ public record ReservationResponse(
         String qrToken
 ) {
 
-    public static ReservationResponse fromReservation(Reservation reservation) {
+    public static ReservationResponse from(Reservation reservation) {
         return new ReservationResponse(
                 reservation.getReservationId(),
                 reservation.getTimeSlot().getTimeSlotId(),
