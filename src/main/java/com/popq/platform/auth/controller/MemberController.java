@@ -12,7 +12,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/members")
 @RequiredArgsConstructor
 public class MemberController {
 
@@ -29,14 +28,14 @@ public class MemberController {
     }
 
     // 내 정보 조회
-    @GetMapping("/me")
+    @GetMapping("/api/members/me")
     public ResponseEntity<MemberInfoResponse> getMyInfo(@AuthenticationPrincipal String email) {
         MemberInfoResponse responseDto = userService.getMyInfo(email);
         return ResponseEntity.ok(responseDto);
     }
 
     // 내 정보 수정
-    @PutMapping("/me")
+    @PutMapping("/api/members/me")
     public ResponseEntity<MemberInfoResponse> updateMyInfo(
             @AuthenticationPrincipal String email,
             @RequestBody MemberUpdateRequest requestDto) {
