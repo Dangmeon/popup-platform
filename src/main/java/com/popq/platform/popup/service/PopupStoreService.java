@@ -157,6 +157,7 @@ public class PopupStoreService {
     // 팝업 삭제
     @Transactional
     public void deletePopup(Long popId, String username) {
+        accessService.checkAdmin(username); // 삭제는 ADMIN만 가능, MANAGER면 403
         PopupStore popup = accessService.checkPopupAccess(popId, username); // 없으면 404, 담당이 아니면 403
         // 회차가 등록된 팝업은 FK 때문에 삭제 불가 -> 500 대신 409 메시지로 안내 / 없는 팝업이면 404
         if (timeSlotRepo.existsByPopId(popId)) {
@@ -189,6 +190,7 @@ public class PopupStoreService {
     // 팝업 종료 (복구 불가) : 시작 전 회차·예약·웨이팅 일괄 취소
     @Transactional
     public PopupStoreResponse cancelPopup(Long popId, String username) {
+        accessService.checkAdmin(username); // 운영 취소는 되돌릴 수 없어서 ADMIN만 가능, MANAGER면 403
         PopupStore popup = accessService.checkPopupAccess(popId, username);
         popup.cancel();
         popupRepo.flush();
