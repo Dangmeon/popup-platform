@@ -1,5 +1,6 @@
 package com.popq.platform.sales.service;
 
+import com.popq.platform.popup.exception.PopupException;
 import com.popq.platform.sales.dto.PopupSalesResponse;
 import com.popq.platform.sales.dto.SalesForecastResponse;
 import com.popq.platform.sales.dto.SalesSummaryResponse;
@@ -9,6 +10,8 @@ import com.popq.platform.auth.entity.User;
 import com.popq.platform.order.entity.OrderStatus;
 import com.popq.platform.order.repository.OrderItemRepository;
 import com.popq.platform.popup.repository.PopupStoreRepository;
+import com.popq.platform.sales.exception.SalesErrorCode;
+import com.popq.platform.sales.exception.SalesException;
 import com.popq.platform.sales.repository.SalesSummaryProjection;
 import com.popq.platform.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -43,10 +46,10 @@ public class AdminSalesService {
     // 플랫폼 전체 누적 확정 매출 조회
     public SalesSummaryResponse getTotalSales(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("PopupStore not found"));
+                .orElseThrow(() -> new SalesException(SalesErrorCode.MEMBER_NOT_FOUND));
 
         if (user.getRole() != Role.ADMIN) {
-            throw new IllegalArgumentException("전체 매출은 관리자만 조회할 수 있습니다.");
+            throw new SalesException(SalesErrorCode.FORBIDDEN_ADMIN_ONLY);
         }
 
         SalesSummaryProjection result = orderItemRepository.findSalesSummary(OrderStatus.PAID);
@@ -61,14 +64,14 @@ public class AdminSalesService {
     // 특정 팝업 누적 확정 매출 조회
     public PopupSalesResponse getPopupSales(String username, Long popId) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("해당 회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new SalesException(SalesErrorCode.MEMBER_NOT_FOUND));
 
         PopupStore popupStore = popupStoreRepository.findById(popId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 팝업을 찾을 수 없습니다."));
+                .orElseThrow(() -> new SalesException(SalesErrorCode.POPUP_NOT_FOUND));
 
         if (user.getRole() == Role.MANAGER) {
             if (popupStore.getManager() == null || !popupStore.getManager().getId().equals(user.getId())) {
-                throw new IllegalArgumentException("담당 팝업의 매출만 조회할 수 있습니다.");
+                throw new SalesException(SalesErrorCode.POPUP_ACCESS_DENIED);
             }
         }
 
@@ -88,10 +91,10 @@ public class AdminSalesService {
      */
     public SalesForecastResponse forecastTotalSales(String username, boolean refresh) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new SalesException(SalesErrorCode.MEMBER_NOT_FOUND));
 
         if (user.getRole() != Role.ADMIN) {
-            throw new IllegalArgumentException("전체 매출 예측은 관리자만 조회할 수 있습니다.");
+            throw new SalesException(SalesErrorCode.FORBIDDEN_ADMIN_ONLY);
         }
 
         String cacheKey = "ALL_MONTH_" + LocalDate.now();
@@ -112,14 +115,14 @@ public class AdminSalesService {
      */
     public SalesForecastResponse forecastPopupSales(String username, Long popId, boolean refresh) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new SalesException(SalesErrorCode.MEMBER_NOT_FOUND));
 
         PopupStore popupStore = popupStoreRepository.findById(popId)
-                .orElseThrow(() -> new IllegalArgumentException("PopupStore not found"));
+                .orElseThrow(() -> new SalesException(SalesErrorCode.POPUP_NOT_FOUND));
 
         if (user.getRole() == Role.MANAGER) {
             if (popupStore.getManager() == null || !popupStore.getManager().getId().equals(user.getId())) {
-                throw new IllegalArgumentException("담당 팝업의 매출 예측만 조회할 수 있습니다.");
+                throw new SalesException(SalesErrorCode.POPUP_ACCESS_DENIED);
             }
         }
 
