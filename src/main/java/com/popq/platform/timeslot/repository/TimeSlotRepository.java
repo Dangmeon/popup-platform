@@ -71,18 +71,15 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
     @Query("SELECT t FROM TimeSlot t WHERE t.timeSlotId = :timeSlotId")
     Optional<TimeSlot> findByIdForUpdate(@Param("timeSlotId") Long timeSlotId);
 
-    //
-
     // 팝업 종료 시: 특정 날짜 이후이거나, 오늘 날짜이면서 아직 시작 전인 OPEN 회차 조회
     @Query("SELECT t FROM TimeSlot t WHERE t.popupStore.popId = :popId AND t.slotStatus = 'OPEN' "
             + "AND (t.slotDate > :today OR (t.slotDate = :today AND t.startTime > :nowTime))")
-    List<TimeSlot> findUpcomingOpenSlots(@Param("popId") Long popId,
-                                         @Param("today") LocalDate today,
-                                         @Param("nowTime") String nowTime);
+    List<TimeSlot> findUpcomingOpenSlots(@Param("popId") Long popId, @Param("today") LocalDate today, @Param("nowTime") String nowTime);
 
-    // 스케줄러용: PAUSE 상태인 팝업 중 시작 시간이 다가왔거나 지난 OPEN 회차 조회
+    // 스케줄러용 : PAUSED 팝업의 OPEN 회차 중 시작 시각이 (지난 실행 시각, 이번 실행 시각] 사이인 회차
+    // 중지 이전에 이미 시작한(끝난) 회차는 대상에서 빠지므로 과거 예약 기록이 취소되지 않음
     @Query("SELECT t FROM TimeSlot t WHERE t.popupStore.opStatus = 'PAUSED' AND t.slotStatus = 'OPEN' "
-            + "AND (t.slotDate < :today OR (t.slotDate = :today AND t.startTime <= :nowTime))")
-    List<TimeSlot> findPausedStartedOpenSlots(@Param("today") LocalDate today,
-                                              @Param("nowTime") String nowTime);
+            + "AND (t.slotDate > :fromDate OR (t.slotDate = :fromDate AND t.startTime > :fromTime)) "
+            + "AND (t.slotDate < :toDate OR (t.slotDate = :toDate AND t.startTime <= :toTime))")
+    List<TimeSlot> findPausedSlotsStartedBetween(@Param("fromDate") LocalDate fromDate, @Param("fromTime") String fromTime, @Param("toDate") LocalDate toDate, @Param("toTime") String toTime);
 }
