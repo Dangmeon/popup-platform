@@ -90,8 +90,8 @@ public class GlobalExceptionHandler {
     }
 
     // 상품 에러 처리
-    @ExceptionHandler(com.popq.platform.product.exception.exception.ProductException.class)
-    public ResponseEntity<Map<String, String>> handleProductException(com.popq.platform.product.exception.exception.ProductException ex) {
+    @ExceptionHandler(com.popq.platform.product.exception.ProductException.class)
+    public ResponseEntity<Map<String, String>> handleProductException(com.popq.platform.product.exception.ProductException ex) {
         Map<String, String> error = new HashMap<>();
 
         error.put("code", ex.getErrorCode().name());
