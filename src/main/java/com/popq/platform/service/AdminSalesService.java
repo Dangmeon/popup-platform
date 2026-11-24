@@ -16,9 +16,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -82,24 +85,22 @@ public class AdminSalesService {
     }
 
     /**
-     * 플랫폼 전체 다음 달 예상 매출 조회 (ADMIN 전용)
-     * @param refresh true면 기존 캐시를 무시하고 Groq API를 새로 호출해 갱신
+     * 전체 팝업 매출 조회 이건 월단위로 계산
      */
     public SalesForecastResponse forecastTotalSales(String username, boolean refresh) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("해당 회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         if (user.getRole() != Role.ADMIN) {
             throw new IllegalArgumentException("전체 매출 예측은 관리자만 조회할 수 있습니다.");
         }
 
-        String cacheKey = "ALL_" + LocalDate.now();
+        String cacheKey = "ALL_MONTH_" + LocalDate.now();
         if (!refresh && forecastCache.containsKey(cacheKey)) {
             return forecastCache.get(cacheKey);
         }
 
-        SalesForecastResponse response = buildForecast(
-                null,
+        SalesForecastResponse response = buildMonthlyForecast(
                 "전체 팝업스토어 (플랫폼 통합)",
                 "상시 운영 (플랫폼 내 진행 중인 전체 팝업스토어 합산 기준)"
         );
@@ -108,14 +109,14 @@ public class AdminSalesService {
     }
 
     /**
-     * 개별 팝업 다음 달 예상 매출 조회 (ADMIN 전체 허용, MANAGER 본인 담당 팝업만 허용)
+     * 개별 팝업 다음 주 매출 조회 이건 주단위로 계산
      */
     public SalesForecastResponse forecastPopupSales(String username, Long popId, boolean refresh) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("해당 회원을 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         PopupStore popupStore = popupStoreRepository.findById(popId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 팝업을 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("PopupStore not found"));
 
         if (user.getRole() == Role.MANAGER) {
             if (popupStore.getManager() == null || !popupStore.getManager().getId().equals(user.getId())) {
@@ -123,12 +124,11 @@ public class AdminSalesService {
             }
         }
 
-        String cacheKey = "POPUP_" + popId + "_" + LocalDate.now();
+        String cacheKey = "POPUP_WEEK_" + popId + "_" + LocalDate.now();
         if (!refresh && forecastCache.containsKey(cacheKey)) {
             return forecastCache.get(cacheKey);
         }
 
-        // 팝업의 실제 시작일~종료일을 프롬프트에 넘겨, 다음 달 도중 종료되는 팝업은 남은 일수를 반영하도록 유도
         String periodNote = String.format(
                 "운영 기간: %s ~ %s (현재 상태: %s)",
                 popupStore.getStartDate(),
@@ -136,56 +136,44 @@ public class AdminSalesService {
                 popupStore.getOpStatus()
         );
 
-        SalesForecastResponse response = buildForecast(popId, popupStore.getTitle(), periodNote);
+        SalesForecastResponse response = buildWeeklyPopupForecast(popId, popupStore.getTitle(), periodNote);
         forecastCache.put(cacheKey, response);
         return response;
     }
 
     /**
-     * 전월·당월 집계 -> 당월 월말 추정치 및 증감률 계산 -> LLM 예측 요청 -> DTO 조립
+     * 월 단위 기준 - 플랫폼 전체 매출 예측 (전월 - 당월 -> 익월)
      */
-    private SalesForecastResponse buildForecast(Long popId, String scopeTitle, String operationPeriodNote) {
+    private SalesForecastResponse buildMonthlyForecast(String scopeTitle, String operationPeriodNote) {
         LocalDate today = LocalDate.now();
         YearMonth currentYm = YearMonth.from(today);
         YearMonth lastYm = currentYm.minusMonths(1);
         YearMonth nextYm = currentYm.plusMonths(1);
 
-        // 조회 기간 경계 설정
-        //    - 저번 달: [저번 달 1일 00:00 ~ 이번 달 1일 00:00)
-        //    - 이번 달: [이번 달 1일 00:00 ~ 내일 00:00)
         LocalDateTime lastStart = lastYm.atDay(1).atStartOfDay();
         LocalDateTime currentStart = currentYm.atDay(1).atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
 
-        // popId 유무에 따라 전체 집계 쿼리 또는 팝업별 집계 쿼리 분기 실행
-        SalesSummaryProjection lastSummary = (popId == null)
-                ? orderItemRepository.findSalesSummaryBetween(OrderStatus.PAID, lastStart, currentStart)
-                : orderItemRepository.findSalesSummaryByPopupBetween(popId, OrderStatus.PAID, lastStart, currentStart);
-
-        SalesSummaryProjection currentSummary = (popId == null)
-                ? orderItemRepository.findSalesSummaryBetween(OrderStatus.PAID, currentStart, tomorrowStart)
-                : orderItemRepository.findSalesSummaryByPopupBetween(popId, OrderStatus.PAID, currentStart, tomorrowStart);
+        SalesSummaryProjection lastSummary =
+                orderItemRepository.findSalesSummaryBetween(OrderStatus.PAID, lastStart, currentStart);
+        SalesSummaryProjection currentSummary =
+                orderItemRepository.findSalesSummaryBetween(OrderStatus.PAID, currentStart, tomorrowStart);
 
         long lastSales = lastSummary.getTotalSales();
         long currentSales = currentSummary.getTotalSales();
 
-        // 이번 달 말 예상 총 매출 계산 (일평균 환산법)
-        //    - 예: 오늘이 15일이고 이번 달 총 일수가 30일이며 현재 매출이 100만 원이면,
-        //          이번 달 말 예상 매출 = (100만 / 15) * 30 = 200만 원
-        //    - 월 중순 시점에서 저번 달(30일치)과 공정하게 비교하기 위해 일평균으로 보정
         int elapsedDays = today.getDayOfMonth();
         int totalDaysInMonth = currentYm.lengthOfMonth();
         long estimatedCurrentSales = (elapsedDays > 0)
                 ? Math.round(((double) currentSales / elapsedDays) * totalDaysInMonth)
                 : currentSales;
 
-        // 전월 대비 이번 달 예상 증감률(%) 계산
         double growthRate = (lastSales > 0)
                 ? ((double) (estimatedCurrentSales - lastSales) / lastSales) * 100.0
                 : (estimatedCurrentSales > 0 ? 100.0 : 0.0);
 
-        // 계산된 정량 수치를 Groq(Llama 3)에 전달하여 다음 달 예상 매출 시나리오와 전략 획득
-        GroqForecastClient.LlmForecastResult llmResult = groqForecastClient.requestNextMonthForecast(
+        GroqForecastClient.LlmForecastResult llmResult = groqForecastClient.requestSalesForecast(
+                "MONTH",
                 scopeTitle,
                 operationPeriodNote,
                 nextYm.toString(),
@@ -197,16 +185,89 @@ public class AdminSalesService {
                 growthRate
         );
 
-        // 최종 응답 DTO 조립
+        return SalesForecastResponse.builder()
+                .popId(null)
+                .popTitle(scopeTitle)
+                .periodUnit("MONTH")
+                .lastPeriodSales(lastSales)
+                .currentPeriodSales(currentSales)
+                .estimatedCurrentSales(estimatedCurrentSales)
+                .growthRatePercent(Math.round(growthRate * 10.0) / 10.0)
+                .targetNextPeriod(nextYm.toString())
+                .expectedNextSales(llmResult.expectedNextSales())
+                .conservativeSales(llmResult.conservativeSales())
+                .optimisticSales(llmResult.optimisticSales())
+                .trendSummary(llmResult.trendSummary())
+                .actionItems(llmResult.actionItems())
+                .fallback(llmResult.fallback())
+                .generatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     *  주 단위 기준 - 개별 팝업스토어 매출 예측 (저번 주 - 이번 주 -> 다음 주)
+     * - 기준: 월요일 00:00:00 ~ 다음 주 월요일 00:00:00 미만 (7일 단위)
+     */
+    private SalesForecastResponse buildWeeklyPopupForecast(Long popId, String scopeTitle, String operationPeriodNote) {
+        LocalDate today = LocalDate.now();
+
+        // 주간 경계 계산 (월요일 시작 기준)
+        LocalDate thisMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate lastMonday = thisMonday.minusWeeks(1);
+        LocalDate nextMonday = thisMonday.plusWeeks(1);
+        LocalDate nextSunday = nextMonday.plusDays(6);
+
+        LocalDateTime lastWeekStart = lastMonday.atStartOfDay();
+        LocalDateTime thisWeekStart = thisMonday.atStartOfDay();
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+
+        // 저번 주(월~일 7일) 및 이번 주(월~오늘) 결제 확정된 매출 조회
+        SalesSummaryProjection lastSummary =
+                orderItemRepository.findSalesSummaryByPopupBetween(popId, OrderStatus.PAID, lastWeekStart, thisWeekStart);
+        SalesSummaryProjection currentSummary =
+                orderItemRepository.findSalesSummaryByPopupBetween(popId, OrderStatus.PAID, thisWeekStart, tomorrowStart);
+
+        long lastSales = lastSummary.getTotalSales();
+        long currentSales = currentSummary.getTotalSales();
+
+        // 이번 주 말 예상 총 매출 계산 (월요일~오늘 경과 일수 기준 7일 환산)
+        // 예) 오늘이 화요일(2일 경과)이고 이번 주 매출이 10만 원이면 -> (10만 / 2) * 7 = 35만 원
+        int elapsedDaysInWeek = (int) ChronoUnit.DAYS.between(thisMonday, today) + 1;
+        long estimatedCurrentSales = (elapsedDaysInWeek > 0)
+                ? Math.round(((double) currentSales / elapsedDaysInWeek) * 7.0)
+                : currentSales;
+
+        // 저번 주 대비 이번 주 예상 증감률(%)
+        double growthRate = (lastSales > 0)
+                ? ((double) (estimatedCurrentSales - lastSales) / lastSales) * 100.0
+                : (estimatedCurrentSales > 0 ? 100.0 : 0.0);
+
+        // 다음 주 기간 라벨 (예: "2026-11-30 ~ 2026-12-06")
+        String nextWeekLabel = nextMonday + " ~ " + nextSunday;
+
+        GroqForecastClient.LlmForecastResult llmResult = groqForecastClient.requestSalesForecast(
+                "WEEK",
+                scopeTitle,
+                operationPeriodNote,
+                nextWeekLabel,
+                lastSales,
+                lastSummary.getTotalOrderCount(),
+                currentSales,
+                currentSummary.getTotalOrderCount(),
+                estimatedCurrentSales,
+                growthRate
+        );
+
         return SalesForecastResponse.builder()
                 .popId(popId)
                 .popTitle(scopeTitle)
-                .lastMonthSales(lastSales)
-                .currentMonthSales(currentSales)
+                .periodUnit("WEEK")
+                .lastPeriodSales(lastSales)
+                .currentPeriodSales(currentSales)
                 .estimatedCurrentSales(estimatedCurrentSales)
-                .growthRatePercent(Math.round(growthRate * 10.0) / 10.0) // 소수점 첫째 자리까지 반올림
-                .targetNextMonth(nextYm.toString())
-                .expectedNextMonthSales(llmResult.expectedNextMonthSales())
+                .growthRatePercent(Math.round(growthRate * 10.0) / 10.0)
+                .targetNextPeriod(nextWeekLabel)
+                .expectedNextSales(llmResult.expectedNextSales())
                 .conservativeSales(llmResult.conservativeSales())
                 .optimisticSales(llmResult.optimisticSales())
                 .trendSummary(llmResult.trendSummary())
