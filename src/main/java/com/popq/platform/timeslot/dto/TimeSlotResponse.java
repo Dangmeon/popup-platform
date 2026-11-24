@@ -24,9 +24,10 @@ public class TimeSlotResponse {
     private Integer remaining; // 남은 자리 = 정원 - 예약 인원 (화면 표시용)
     private LocalDateTime reservOpenAt;  // 예약 오픈 일시 (계산값)
     private LocalDateTime reservCloseAt; // 예약 마감 일시 (계산값, 이 시각부터 예약 불가)
+    private boolean hasReservationHistory; // 예약 이력 여부 (취소, 만료 포함) : true면 삭제, 날짜/시간 수정 불가
 
     // Entity -> Response 변환시 사용
-    public static TimeSlotResponse toDto(TimeSlot entity) {
+    public static TimeSlotResponse toDto(TimeSlot entity, boolean hasReservationHistory) {
         // 값이 비어 있는 데이터(SQL로 직접 넣은 행 등)가 있어도 목록 전체가 500이 나지 않도록 계산값은 null로 둠
         Integer remaining = null;
         if (entity.getCapacity() != null && entity.getReservedCount() != null) {
@@ -52,6 +53,7 @@ public class TimeSlotResponse {
                 .remaining(remaining)
                 .reservOpenAt(reservOpenAt)
                 .reservCloseAt(reservCloseAt)
+                .hasReservationHistory(hasReservationHistory)
                 .build();
     }
 }
