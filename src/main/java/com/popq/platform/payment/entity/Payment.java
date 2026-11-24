@@ -2,13 +2,14 @@ package com.popq.platform.payment.entity;
 
 import com.popq.platform.order.entity.Order;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Entity
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Table(name = "payment")
 public class Payment {
@@ -46,7 +47,7 @@ public class Payment {
     @Column(name = "canceled_at")
     private LocalDateTime canceledAt;
 
-    public static Payment createPayment(Order order, String paymentKey, int amount){
+    public static Payment create(Order order, String paymentKey, int amount){
         Payment payment = new Payment();
 
         payment.order = order;
