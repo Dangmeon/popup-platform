@@ -40,4 +40,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         ORDER BY o.orderedAt DESC
     """)
     List<Order> findAllOrders();
+
+    Optional<Order> findTopByUserUsernameOrderByOrderedAtDesc(String username);
 }
