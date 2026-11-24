@@ -19,6 +19,7 @@ public class OrderCreateRequest {
 
     private String receiverName;
     private String receiverPhone;
-    private String receiverAddress;
+    private String deliveryAddress;
+    private String deliveryAddressDetail;
     private String deliveryMemo;
 }

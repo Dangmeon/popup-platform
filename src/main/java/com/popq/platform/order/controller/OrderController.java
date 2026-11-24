@@ -3,6 +3,7 @@ package com.popq.platform.order.controller;
 import com.popq.platform.order.dto.OrderCreateRequest;
 import com.popq.platform.order.dto.OrderDetailResponse;
 import com.popq.platform.order.dto.OrderResponse;
+import com.popq.platform.order.dto.RecentDeliveryResponse;
 import com.popq.platform.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -56,5 +57,14 @@ public class OrderController {
         String username = authentication.getName();
 
         return ResponseEntity.ok(orderService.cancelOrder(username, orderId));
+    }
+
+    @GetMapping("/recent-delivery")
+    public ResponseEntity<RecentDeliveryResponse> getRecentDelivery(
+            Authentication authentication
+    ){
+        String username = authentication.getName();
+
+        return ResponseEntity.ok(orderService.getRecentDelivery(username));
     }
 }
