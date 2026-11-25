@@ -1,13 +1,15 @@
 package com.popq.platform.sales.controller;
 
-import com.popq.platform.sales.dto.PopupSalesResponse;
-import com.popq.platform.sales.dto.SalesSummaryResponse;
-import com.popq.platform.sales.dto.SalesForecastResponse;
+import com.popq.platform.sales.dto.*;
 import com.popq.platform.sales.service.AdminSalesService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -20,10 +22,9 @@ public class AdminSalesController {
     public ResponseEntity<SalesSummaryResponse> getTotalSales(
             Authentication authentication
     ){
-        SalesSummaryResponse response =
-                adminSalesService.getTotalSales(authentication.getName());
+        String username = authentication.getName();
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(adminSalesService.getTotalSales(username));
     }
 
     @GetMapping("/popups/{popId}/sales")
@@ -33,10 +34,27 @@ public class AdminSalesController {
     ){
         String username = authentication.getName();
 
-        PopupSalesResponse response =
-                adminSalesService.getPopupSales(username, popId);
+        return ResponseEntity.ok(adminSalesService.getPopupSales(username, popId));
+    }
 
-        return ResponseEntity.ok(response);
+    @GetMapping("/monthly")
+    public ResponseEntity<List<MonthlySalesResponse>> getMonthlySales(
+            Authentication authentication
+    ){
+        String username = authentication.getName();
+
+        return ResponseEntity.ok(adminSalesService.getMonthlySales(username));
+    }
+
+    @GetMapping("/popups/{popId}/weekly")
+    public ResponseEntity<List<WeekSalesResponse>> getWeeklySales(
+            Authentication authentication,
+            @PathVariable Long popId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ){
+        String username = authentication.getName();
+
+        return ResponseEntity.ok(adminSalesService.getWeeklySales(username, popId, date));
     }
 
     /**
