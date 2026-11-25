@@ -116,6 +116,10 @@ public class TimeSlotService {
 
         popup.validateNotCancelled(); // 취소된 팝업에 회차 수정 불가
 
+        if ("CANCELLED".equals(slot.getSlotStatus())) { // 취소된 회차는 수정 불가 (다시 열 수 없음)
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_ALREADY_CANCELLED);
+        }
+
         checkTimeSlot(popup, request);
         boolean hasHistory = reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId); // 아래 응답에서도 사용
 
