@@ -1,26 +1,29 @@
 package com.popq.platform.timeslot.service;
 
-import com.popq.platform.timeslot.dto.TimeSlotGenerateRequest;
-import com.popq.platform.timeslot.dto.TimeSlotRequest;
-import com.popq.platform.timeslot.dto.TimeSlotResponse;
 import com.popq.platform.popup.entity.PopupStore;
-import com.popq.platform.timeslot.entity.TimeSlot;
 import com.popq.platform.popup.exception.PopupErrorCode;
 import com.popq.platform.popup.exception.PopupException;
-import com.popq.platform.timeslot.exception.TimeSlotErrorCode;
-import com.popq.platform.timeslot.exception.TimeSlotException;
 import com.popq.platform.popup.repository.PopupStoreRepository;
 import com.popq.platform.popup.service.PopupAccessService;
 import com.popq.platform.reservation.entity.Reservation;
 import com.popq.platform.reservation.entity.ReservationStatus;
 import com.popq.platform.reservation.repository.ReservationRepository;
+import com.popq.platform.timeslot.dto.TimeSlotChangedEvent;
+import com.popq.platform.timeslot.dto.TimeSlotGenerateRequest;
+import com.popq.platform.timeslot.dto.TimeSlotRequest;
+import com.popq.platform.timeslot.dto.TimeSlotResponse;
+import com.popq.platform.timeslot.entity.TimeSlot;
+import com.popq.platform.timeslot.exception.TimeSlotErrorCode;
+import com.popq.platform.timeslot.exception.TimeSlotException;
 import com.popq.platform.timeslot.repository.TimeSlotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,18 +34,21 @@ public class TimeSlotService {
 
     private static final String TIME_REGEX = "^([01]\\d|2[0-3]):[0-5]\\d$"; // HH:mm
     private static final int MIN_INTERVAL_MINUTES = 30; // 자동 생성 회차 간격 최소값 (분)
+    private LocalDateTime lastPauseCheckAt = LocalDateTime.now(); // 일시 중지 자동 취소 스케줄러가 마지막으로 확인한 시각 (서버 시작 시각부터 시작)
 
     TimeSlotRepository timeSlotRepo;
     PopupStoreRepository popupRepo;
     ReservationRepository reservationRepo;
     PopupAccessService accessService;
+    ApplicationEventPublisher eventPublisher; // 회차 변경 이벤트 발행
 
     @Autowired
-    public TimeSlotService(TimeSlotRepository timeSlotRepo, PopupStoreRepository popupRepo, ReservationRepository reservationRepo, PopupAccessService accessService) {
+    public TimeSlotService(TimeSlotRepository timeSlotRepo, PopupStoreRepository popupRepo, ReservationRepository reservationRepo, PopupAccessService accessService, ApplicationEventPublisher eventPublisher) {
         this.timeSlotRepo = timeSlotRepo;
         this.popupRepo = popupRepo;
         this.reservationRepo = reservationRepo;
         this.accessService = accessService;
+        this.eventPublisher = eventPublisher;
     }
 
     // 회차 목록 (date가 있으면 그 날짜만)
@@ -110,6 +116,10 @@ public class TimeSlotService {
 
         popup.validateNotCancelled(); // 취소된 팝업에 회차 수정 불가
 
+        if ("CANCELLED".equals(slot.getSlotStatus())) { // 취소된 회차는 수정 불가 (다시 열 수 없음)
+            throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_ALREADY_CANCELLED);
+        }
+
         checkTimeSlot(popup, request);
         boolean hasHistory = reservationRepo.existsByTimeSlot_TimeSlotId(timeSlotId); // 아래 응답에서도 사용
 
@@ -129,6 +139,7 @@ public class TimeSlotService {
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_OVERLAP);
         }
         slot.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE (예약 인원은 그대로)
+        eventPublisher.publishEvent(new TimeSlotChangedEvent(slot.getTimeSlotId()));
         return TimeSlotResponse.toDto(slot, hasHistory);
     }
 
@@ -345,6 +356,7 @@ public class TimeSlotService {
         // 회차 상태 CANCELLED 변경 및 인원수 0으로 초기화
         slot.resetReservedCount();
         slot.cancel();
+        eventPublisher.publishEvent(new TimeSlotChangedEvent(slot.getTimeSlotId())); // 예약 화면에 회차 취소를 바로 반영 : 트랜잭션 커밋 후 TimeSlotEventListener가 WebSocket 전송
     }
 
     // 관리자 개별 회차 취소 API용
@@ -383,12 +395,14 @@ public class TimeSlotService {
     @org.springframework.scheduling.annotation.Scheduled(cron = "0 * * * * *")
     @Transactional
     public void autoCancelPausedStartedSlots() {
-        LocalDate today = LocalDate.now();
-        String nowTime = LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
-        List<TimeSlot> targetSlots = timeSlotRepo.findPausedStartedOpenSlots(today, nowTime);
+        java.time.format.DateTimeFormatter hhmm = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+        LocalDateTime from = lastPauseCheckAt;
+        LocalDateTime to = LocalDateTime.now();
+        List<TimeSlot> targetSlots = timeSlotRepo.findPausedSlotsStartedBetween(from.toLocalDate(), from.format(hhmm), to.toLocalDate(), to.format(hhmm));
         for (TimeSlot slot : targetSlots) {
             TimeSlot lockedSlot = findTimeSlotForUpdate(slot.getTimeSlotId());
             cancelSlotInternal(lockedSlot);
         }
+        lastPauseCheckAt = to; // 다음 실행은 여기부터 확인 (중간에 오류가 나면 갱신하지 않아 다음에 다시 확인)
     }
 }

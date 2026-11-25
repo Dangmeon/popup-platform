@@ -8,6 +8,7 @@ import com.popq.platform.qna.exception.QnaErrorCode;
 import com.popq.platform.qna.exception.QnaException;
 import com.popq.platform.order.exception.OrderException;
 import com.popq.platform.reservation.exception.ReservationException;
+import com.popq.platform.sales.exception.SalesException;
 import com.popq.platform.timeslot.exception.TimeSlotException;
 import com.popq.platform.waiting.exception.WaitingErrorCode;
 import com.popq.platform.waiting.exception.WaitingException;
@@ -182,5 +183,15 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(errorCode.getStatus()).body(response);
+    }
+    // 매출 관련 예외
+    @ExceptionHandler(SalesException.class)
+    public ResponseEntity<Map<String, String>> handleOrderException(SalesException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
     }
 }

@@ -157,6 +157,7 @@ public class PopupStoreService {
     // 팝업 삭제
     @Transactional
     public void deletePopup(Long popId, String username) {
+        accessService.checkAdmin(username); // 삭제는 ADMIN만 가능, MANAGER면 403
         PopupStore popup = accessService.checkPopupAccess(popId, username); // 없으면 404, 담당이 아니면 403
         // 회차가 등록된 팝업은 FK 때문에 삭제 불가 -> 500 대신 409 메시지로 안내 / 없는 팝업이면 404
         if (timeSlotRepo.existsByPopId(popId)) {
@@ -165,6 +166,11 @@ public class PopupStoreService {
         if (productRepo.existsByPopId(popId)) {
             throw new PopupException(PopupErrorCode.POPUP_HAS_PRODUCTS);
         }
+        if (popupRepo.existsEnteredWaitingByPopId(popId)) { // 입장 완료 기록이 있으면 삭제 불가 -> 운영 취소 안내
+            throw new PopupException(PopupErrorCode.POPUP_HAS_ENTERED_WAITINGS);
+        }
+        popupRepo.deleteWaitingsByPopId(popId); // 나머지 웨이팅(대기·호출·취소·만료)은 같이 삭제
+        popupRepo.deleteFavoritesByPopId(popId); // 찜은 같이 삭제 (삭제는 ADMIN만 가능)
         popupRepo.delete(popup);
     }
 
@@ -189,12 +195,16 @@ public class PopupStoreService {
     // 팝업 종료 (복구 불가) : 시작 전 회차·예약·웨이팅 일괄 취소
     @Transactional
     public PopupStoreResponse cancelPopup(Long popId, String username) {
+        accessService.checkAdmin(username); // 운영 취소는 되돌릴 수 없어서 ADMIN만 가능, MANAGER면 403
         PopupStore popup = accessService.checkPopupAccess(popId, username);
         popup.cancel();
         popupRepo.flush();
 
         // 시작 전 회차 및 해당 회차 예약 일괄 취소
         timeSlotService.cancelUpcomingSlotsByPopup(popId);
+
+        // 아래 웨이팅 일괄 UPDATE가 영속성 컨텍스트를 비우기 전에 회차·예약 취소를 먼저 DB에 반영
+        timeSlotRepo.flush();
 
         // 미입장 웨이팅(WAITING, CALLED) 일괄 취소
         int cancelledWaitings = waitingQueueRepo.bulkCancelActiveWaitingsByPopup(

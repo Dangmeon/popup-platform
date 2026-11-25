@@ -22,7 +22,7 @@ public class ReservationWebSocketService {
                 .orElseThrow(() -> new IllegalArgumentException("회차를 찾을 수 없습니다."));
 
         int remainingCount = timeSlot.getCapacity() - timeSlot.getReservedCount();
-        boolean closed = remainingCount <= 0;
+        boolean closed = remainingCount <= 0 || "CANCELLED".equals(timeSlot.getSlotStatus()); // 취소된 회차도 마감으로 전송
 
         System.out.println(
                 "WebSocket 전송: timeSlotId=" + timeSlotId +
