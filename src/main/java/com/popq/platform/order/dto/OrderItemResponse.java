@@ -1,28 +1,23 @@
 package com.popq.platform.order.dto;
 
 import com.popq.platform.order.entity.OrderItem;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 
-@Getter
-@NoArgsConstructor
-public class OrderItemResponse {
+public record OrderItemResponse (
 
-    private Long orderItemId;
-    private Long prdId;
-    private  String productName;
-    private Integer quantity;
-    private int price;
+    Long orderItemId,
+    Long prdId,
+    String productName,
+    Integer quantity,
+    int price
 
+){
     public static OrderItemResponse from(OrderItem orderItem) {
-        OrderItemResponse response = new OrderItemResponse();
-
-        response.orderItemId = orderItem.getOrderItemId();
-        response.prdId = orderItem.getProduct().getPrdId();
-        response.productName = orderItem.getProduct().getProductName();
-        response.quantity = orderItem.getQuantity();
-        response.price = orderItem.getPrice();
-
-        return response;
+        return new OrderItemResponse(
+                orderItem.getOrderItemId(),
+                orderItem.getProduct().getPrdId(),
+                orderItem.getProduct().getProductName(),
+                orderItem.getQuantity(),
+                orderItem.getPrice()
+        );
     }
 }

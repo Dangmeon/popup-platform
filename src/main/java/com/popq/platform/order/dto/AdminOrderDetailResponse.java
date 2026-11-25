@@ -2,35 +2,32 @@ package com.popq.platform.order.dto;
 
 import com.popq.platform.order.entity.Order;
 import com.popq.platform.order.entity.OrderStatus;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Getter
-@AllArgsConstructor
-public class AdminOrderDetailResponse {
+public record AdminOrderDetailResponse(
+        Long orderId,
+        String tossOrderId,
 
-    private Long orderId;
-    private String tossOrderId;
+        Long userId,
+        String userName,
+        String userEmail,
 
-    private Long userId;
-    private String userName;
-    private String userEmail;
+        int totalPrice,
+        OrderStatus status,
 
-    private int totalPrice;
-    private OrderStatus status;
+        LocalDateTime orderedAt,
+        LocalDateTime paymentAt,
 
-    private LocalDateTime orderedAt;
-    private LocalDateTime paymentAt;
+        String receiverName,
+        String receiverPhone,
+        String deliveryAddress,
+        String deliveryAddressDetail,
+        String deliveryMemo,
 
-    private String receiverName;
-    private String receiverPhone;
-    private String deliveryAddress;
-    private String deliveryMemo;
-
-    private List<AdminOrderItemResponse> items;
+        List<AdminOrderItemResponse> items
+) {
 
     public static AdminOrderDetailResponse from(Order order) {
 
@@ -41,22 +38,18 @@ public class AdminOrderDetailResponse {
         return new AdminOrderDetailResponse(
                 order.getOrderId(),
                 order.getTossOrderId(),
-
                 order.getUser().getId(),
                 order.getUser().getName(),
                 order.getUser().getUsername(),
-
                 order.getTotalPrice(),
                 order.getOrderStatus(),
-
                 order.getOrderedAt(),
                 order.getPaymentAt(),
-
                 order.getReceiverName(),
                 order.getReceiverPhone(),
                 order.getDeliveryAddress(),
+                order.getDeliveryAddressDetail(),
                 order.getDeliveryMemo(),
-
                 items
         );
     }

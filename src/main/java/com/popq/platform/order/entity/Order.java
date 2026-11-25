@@ -3,6 +3,7 @@ package com.popq.platform.order.entity;
 import com.popq.platform.auth.entity.User;
 import com.popq.platform.coupon.entity.UserCoupon;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -13,7 +14,7 @@ import java.util.UUID;
 
 @Entity
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "ORDERS")
 public class Order {
 
@@ -62,6 +63,9 @@ public class Order {
     @Column(name = "DELIVERY_ADDRESS")
     private String deliveryAddress;
 
+    @Column(name = "DELIVERY_ADDRESS_DETAIL")
+    private String deliveryAddressDetail;
+
     @Column(name = "DELIVERY_MEMO")
     private String deliveryMemo;
 
@@ -96,8 +100,8 @@ public class Order {
 
     public static Order createOrder(
             User user, int totalPrice, LocalDateTime expiresAt,
-            String receiverName, String receiverPhone, String deliveryAddress, String deliveryMemo,
-            UserCoupon userCoupon
+            String receiverName, String receiverPhone, String deliveryAddress, String deliveryAddressDetail,
+            String deliveryMemo, UserCoupon userCoupon
     )
     {
         Order order = new Order();
@@ -111,6 +115,7 @@ public class Order {
         order.receiverName = receiverName;
         order.receiverPhone = receiverPhone;
         order.deliveryAddress = deliveryAddress;
+        order.deliveryAddressDetail = deliveryAddressDetail;
         order.deliveryMemo = deliveryMemo;
 
         order.userCoupon = userCoupon;

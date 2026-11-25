@@ -1,6 +1,6 @@
 package com.popq.platform.reservation.entity;
 
-import com.popq.platform.entity.TimeSlot;
+import com.popq.platform.timeslot.entity.TimeSlot;
 import com.popq.platform.auth.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -8,9 +8,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Table(name = "reservation")
 public class Reservation {
@@ -65,21 +63,32 @@ public class Reservation {
         this.reservationStatus = ReservationStatus.EXPIRED;
     }
 
-    public void updateTimeSlot(TimeSlot timeSlot, int peopleCount){
+    public void changeReservation(TimeSlot timeSlot, int peopleCount){
         this.timeSlot = timeSlot;
         this.peopleCount = peopleCount;
     }
 
-    public void updateQrToken(String qrToken) {
+    public void renewQrToken(String qrToken) {
         this.qrToken = qrToken;
     }
 
-    public static Reservation create(User user, TimeSlot timeSlot, int peopleCount, LocalDateTime reservedAt, LocalDateTime expiresAt){
+    @Builder(access = AccessLevel.PRIVATE)
+    private Reservation(User user, TimeSlot timeSlot, int peopleCount, LocalDateTime reservedAt, LocalDateTime expiresAt
+    ) {
+        this.user = user;
+        this.timeSlot = timeSlot;
+        this.peopleCount = peopleCount;
+        this.reservationStatus = ReservationStatus.HOLD;
+        this.reservedAt = reservedAt;
+        this.expiresAt = expiresAt;
+    }
+
+    public static Reservation create(User user, TimeSlot timeSlot, int peopleCount, LocalDateTime reservedAt, LocalDateTime expiresAt
+    ) {
         return Reservation.builder()
                 .user(user)
                 .timeSlot(timeSlot)
                 .peopleCount(peopleCount)
-                .reservationStatus(ReservationStatus.HOLD)
                 .reservedAt(reservedAt)
                 .expiresAt(expiresAt)
                 .build();

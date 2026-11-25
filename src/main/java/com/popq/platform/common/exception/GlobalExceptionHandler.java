@@ -1,0 +1,221 @@
+package com.popq.platform.common.exception;
+
+import com.popq.platform.image.exception.ImageErrorCode;
+import com.popq.platform.image.exception.ImageException;
+import com.popq.platform.payment.exception.PaymentException;
+import com.popq.platform.popup.exception.PopupException;
+import com.popq.platform.qna.exception.QnaErrorCode;
+import com.popq.platform.qna.exception.QnaException;
+import com.popq.platform.order.exception.OrderException;
+import com.popq.platform.reservation.exception.ReservationException;
+import com.popq.platform.sales.exception.SalesException;
+import com.popq.platform.timeslot.exception.TimeSlotException;
+import com.popq.platform.waiting.exception.WaitingErrorCode;
+import com.popq.platform.waiting.exception.WaitingException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    // 1. DTO 유효성 검증(@Valid) 실패 시 발생하는 에러 처리
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Object> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new HashMap<>();
+        for (FieldError error : ex.getBindingResult().getFieldErrors()) {
+            errors.putIfAbsent(error.getField(), error.getDefaultMessage());
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+    }
+
+    // 2. 비즈니스 로직 예외 처리
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Object> handleIllegalArgumentException(IllegalArgumentException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("message", ex.getMessage()); // 프론트엔드가 'message'로 읽을 때 대응
+        error.put("error", ex.getMessage());   // 기존 호환용
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    // 3. 데이터베이스 제약 조건 위반 처리
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Object> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+        Map<String, String> error = new HashMap<>();
+        String errorMessage = "이미 사용 중인 정보(이메일 또는 전화번호 등)입니다.";
+
+        error.put("message", errorMessage);
+        error.put("error", errorMessage);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    // 인증 에러 처리
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<Map<String, String>> handleAuthException(AuthException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+
+    }
+
+    // 쿠폰 에러 처리
+    @ExceptionHandler(CouponException.class)
+    public ResponseEntity<Map<String, String>> handleCouponException(CouponException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+
+    }
+
+    // 예약 에러 처리
+    @ExceptionHandler(ReservationException.class)
+        public ResponseEntity<Map<String, String>> handleReservationException(ReservationException ex) {
+            Map<String, String> error = new HashMap<>();
+
+            error.put("code", ex.getErrorCode().name());
+            error.put("message", ex.getErrorCode().getMessage());
+
+            return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+
+    }
+
+    // 팝업 에러 처리
+    @ExceptionHandler(PopupException.class)
+    public ResponseEntity<Map<String, String>> handlePopupException(PopupException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 회차 에러 처리
+    @ExceptionHandler(TimeSlotException.class)
+    public ResponseEntity<Map<String, String>> handleTimeSlotException(TimeSlotException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 상품 에러 처리
+    @ExceptionHandler(com.popq.platform.product.exception.ProductException.class)
+    public ResponseEntity<Map<String, String>> handleProductException(com.popq.platform.product.exception.ProductException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 결제 에러 처리
+    @ExceptionHandler(PaymentException.class)
+    public ResponseEntity<Map<String, String>> handlePaymentException(PaymentException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalStateException(IllegalStateException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", "INVALID_STATE");
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(OrderException.class)
+    public ResponseEntity<Map<String, String>> handleOrderException(OrderException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 이미지 에러 처리
+    @ExceptionHandler(ImageException.class)
+    public ResponseEntity<Map<String, String>> handleImageException(ImageException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+
+    // 업로드 용량 초과 (spring.servlet.multipart.max-file-size 초과 시 스프링이 던짐)
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, String>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ImageErrorCode.IMAGE_TOO_LARGE.name());
+        error.put("message", ImageErrorCode.IMAGE_TOO_LARGE.getMessage());
+
+        return ResponseEntity.status(ImageErrorCode.IMAGE_TOO_LARGE.getStatus()).body(error);
+    }
+
+    // 대기 관련 예외 처리
+    @ExceptionHandler(WaitingException.class)
+    public ResponseEntity<ErrorResponse> handleWaitingException(WaitingException e) {
+        WaitingErrorCode errorCode = e.getErrorCode();
+
+        ErrorResponse response = new ErrorResponse(
+                errorCode.name(),          // 에러 코드 문자열 (예: "ALREADY_CALLED")
+                errorCode.getMessage(),   // 에러 메시지 (예: "이미 호출된 대기입니다.")
+                null                      // 유효성 검증 필드 에러가 아니므로 null
+        );
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(response);
+    }
+
+    // QnA 관련 예외 처리
+    @ExceptionHandler(QnaException.class)
+    public ResponseEntity<ErrorResponse> handleQnaException(QnaException ex) {
+        QnaErrorCode errorCode = ex.getErrorCode();
+
+        ErrorResponse response = new ErrorResponse(
+                errorCode.name(),
+                errorCode.getMessage(),
+                null
+        );
+
+        return ResponseEntity.status(errorCode.getStatus()).body(response);
+    }
+    // 매출 관련 예외
+    @ExceptionHandler(SalesException.class)
+    public ResponseEntity<Map<String, String>> handleOrderException(SalesException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+    }
+}

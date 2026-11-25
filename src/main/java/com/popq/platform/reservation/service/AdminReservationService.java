@@ -4,7 +4,7 @@ import com.popq.platform.reservation.dto.AdminReservationResponse;
 import com.popq.platform.reservation.entity.Reservation;
 import com.popq.platform.reservation.entity.ReservationStatus;
 import com.popq.platform.reservation.repository.ReservationRepository;
-import com.popq.platform.service.PopupAccessService;
+import com.popq.platform.popup.service.PopupAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

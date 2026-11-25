@@ -29,18 +29,18 @@ public class AdminReservationResponse {
     private LocalDateTime reservedAt;
 
     public static AdminReservationResponse from(Reservation reservation) {
-        return new AdminReservationResponse(
-                reservation.getReservationId(),
-                reservation.getTimeSlot().getPopupStore().getPopId(),
-                reservation.getTimeSlot().getPopupStore().getTitle(),
-                reservation.getTimeSlot().getTimeSlotId(),
-                reservation.getTimeSlot().getSlotDate(),
-                reservation.getTimeSlot().getStartTime(),
-                reservation.getUser().getId(),
-                reservation.getUser().getUsername(),
-                reservation.getPeopleCount(),
-                reservation.getReservationStatus(),
-                reservation.getReservedAt()
-        );
+        return AdminReservationResponse.builder()
+                .reservationId(reservation.getReservationId())
+                .popId(reservation.getTimeSlot().getPopupStore().getPopId())
+                .title(reservation.getTimeSlot().getPopupStore().getTitle())
+                .timeSlotId(reservation.getTimeSlot().getTimeSlotId())
+                .slotDate(reservation.getTimeSlot().getSlotDate())
+                .startTime(reservation.getTimeSlot().getStartTime())
+                .memberId(reservation.getUser().getId())
+                .username(reservation.getUser().getUsername())
+                .peopleCount(reservation.getPeopleCount())
+                .reservationStatus(reservation.getReservationStatus())
+                .reservedAt(reservation.getReservedAt())
+                .build();
     }
 }

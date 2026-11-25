@@ -1,9 +1,9 @@
 package com.popq.platform.reservation.dto;
 
-import com.popq.platform.entity.PopupStore;
+import com.popq.platform.popup.entity.PopupStore;
 import com.popq.platform.reservation.entity.Reservation;
 import com.popq.platform.reservation.entity.ReservationStatus;
-import com.popq.platform.entity.TimeSlot;
+import com.popq.platform.timeslot.entity.TimeSlot;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -25,7 +25,7 @@ public record ReservationDetailResponse(
         String popupImage
 ) {
 
-    public static ReservationDetailResponse fromDetailReservation(Reservation reservation) {
+    public static ReservationDetailResponse from(Reservation reservation) {
         TimeSlot timeSlot = reservation.getTimeSlot();
         PopupStore popupStore = timeSlot.getPopupStore();
 

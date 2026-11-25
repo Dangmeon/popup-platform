@@ -1,13 +1,14 @@
 package com.popq.platform.order.entity;
 
-import com.popq.platform.entity.Product;
+import com.popq.platform.product.entity.Product;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "ORDER_ITEM")
 public class OrderItem {
 
