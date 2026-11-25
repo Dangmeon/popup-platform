@@ -1,5 +1,7 @@
 package com.popq.platform.common.exception;
 
+import com.popq.platform.exception.AuthException;
+import com.popq.platform.exception.CouponException;
 import com.popq.platform.image.exception.ImageErrorCode;
 import com.popq.platform.image.exception.ImageException;
 import com.popq.platform.payment.exception.PaymentException;
@@ -57,15 +59,39 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
-    // 예약 에러 처리
-    @ExceptionHandler(ReservationException.class)
-    public ResponseEntity<Map<String, String>> handleReservationException(ReservationException ex) {
+    // 인증 에러 처리
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<Map<String, String>> handleAuthException(AuthException ex) {
         Map<String, String> error = new HashMap<>();
 
         error.put("code", ex.getErrorCode().name());
         error.put("message", ex.getErrorCode().getMessage());
 
         return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+
+    }
+
+    // 쿠폰 에러 처리
+    @ExceptionHandler(CouponException.class)
+    public ResponseEntity<Map<String, String>> handleCouponException(CouponException ex) {
+        Map<String, String> error = new HashMap<>();
+
+        error.put("code", ex.getErrorCode().name());
+        error.put("message", ex.getErrorCode().getMessage());
+
+        return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
+
+    }
+
+    // 예약 에러 처리
+    @ExceptionHandler(ReservationException.class)
+        public ResponseEntity<Map<String, String>> handleReservationException(ReservationException ex) {
+            Map<String, String> error = new HashMap<>();
+
+            error.put("code", ex.getErrorCode().name());
+            error.put("message", ex.getErrorCode().getMessage());
+
+            return ResponseEntity.status(ex.getErrorCode().getStatus()).body(error);
 
     }
 
