@@ -44,6 +44,9 @@ public class ProductResponse {
 
     // 지금 시간 기준 판매 상태 계산
     private static String getSaleStatus(Product entity) {
+        if (entity.getPopupStore() != null && "CANCELLED".equals(entity.getPopupStore().getOpStatus())) {
+            return "ENDED"; // 운영 취소된 팝업의 상품은 판매종료
+        }
         LocalDateTime now = LocalDateTime.now();
         if (entity.getSaleStart() != null && now.isBefore(entity.getSaleStart())) {
             return "UPCOMING";
