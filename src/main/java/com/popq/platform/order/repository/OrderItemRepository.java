@@ -2,7 +2,9 @@ package com.popq.platform.order.repository;
 
 import com.popq.platform.order.entity.OrderItem;
 import com.popq.platform.order.entity.OrderStatus;
+import com.popq.platform.sales.repository.MonthlySalesProjection;
 import com.popq.platform.sales.repository.SalesSummaryProjection;
+import com.popq.platform.sales.repository.WeeklySalesProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -53,6 +55,51 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     SalesSummaryProjection findSalesSummaryByPopup(
             @Param("popId") Long popId,
             @Param("status") OrderStatus status
+    );
+
+    @Query("""
+        SELECT
+            YEAR(o.paymentAt) AS year,
+            MONTH(o.paymentAt) AS month,
+            SUM(oi.price * oi.quantity) AS totalSales
+        FROM OrderItem oi
+        JOIN oi.order o
+        WHERE o.orderStatus = :status
+          AND o.paymentAt >= :start
+          AND o.paymentAt < :end
+        GROUP BY YEAR(o.paymentAt), MONTH(o.paymentAt)
+        ORDER BY YEAR(o.paymentAt), MONTH(o.paymentAt)
+    """)
+    List<MonthlySalesProjection> findMonthlySales(
+            @Param("status") OrderStatus status,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    // 특정 팝업의 기간별 일별 매출 집계
+    @Query("""
+        SELECT
+            YEAR(o.paymentAt) AS year,
+            MONTH(o.paymentAt) AS month,
+            DAY(o.paymentAt) AS day,
+            SUM(oi.price * oi.quantity) AS totalSales
+        FROM OrderItem oi
+        JOIN oi.order o
+        JOIN oi.product p
+        WHERE p.popupStore.popId = :popId
+          AND o.orderStatus = :status
+          AND o.paymentAt >= :start
+          AND o.paymentAt < :end
+        GROUP BY
+            YEAR(o.paymentAt),
+            MONTH(o.paymentAt),
+            DAY(o.paymentAt)
+    """)
+    List<WeeklySalesProjection> findWeeklyPopupSales(
+            @Param("popId") Long popId,
+            @Param("status") OrderStatus status,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
     );
 
     /**
