@@ -1,5 +1,7 @@
 package com.popq.platform.common.exception;
 
+import com.popq.platform.exception.AuthException;
+import com.popq.platform.exception.CouponException;
 import com.popq.platform.image.exception.ImageErrorCode;
 import com.popq.platform.image.exception.ImageException;
 import com.popq.platform.payment.exception.PaymentException;
