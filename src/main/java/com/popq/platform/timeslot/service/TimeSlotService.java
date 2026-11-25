@@ -139,6 +139,7 @@ public class TimeSlotService {
             throw new TimeSlotException(TimeSlotErrorCode.TIMESLOT_OVERLAP);
         }
         slot.update(request); // 변경 감지 : save() 없이 트랜잭션이 끝날 때 자동으로 UPDATE (예약 인원은 그대로)
+        eventPublisher.publishEvent(new TimeSlotChangedEvent(slot.getTimeSlotId()));
         return TimeSlotResponse.toDto(slot, hasHistory);
     }
 
