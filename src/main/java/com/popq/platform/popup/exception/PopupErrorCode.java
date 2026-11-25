@@ -9,6 +9,7 @@ public enum PopupErrorCode {
     POPUP_NOT_FOUND(HttpStatus.NOT_FOUND, "팝업스토어 정보를 찾을 수 없습니다."),
     POPUP_HAS_TIMESLOTS(HttpStatus.CONFLICT, "회차가 등록된 팝업은 삭제할 수 없습니다. 회차를 먼저 삭제해주세요."),
     POPUP_HAS_PRODUCTS(HttpStatus.CONFLICT, "상품이 등록된 팝업은 삭제할 수 없습니다. 상품을 먼저 삭제해주세요."),
+    POPUP_HAS_ENTERED_WAITINGS(HttpStatus.CONFLICT, "웨이팅 입장 기록이 있는 팝업은 삭제할 수 없습니다. 운영 취소를 이용해주세요."),
     POPUP_REQUIRED_FIELD(HttpStatus.BAD_REQUEST, "팝업명, 장소, 운영 시작일, 종료일, 예약 시작·종료 시간은 필수입니다."),
     INVALID_POPUP_PERIOD(HttpStatus.BAD_REQUEST, "종료일은 시작일보다 빠를 수 없습니다."),
     INVALID_RESERV_TIME_FORMAT(HttpStatus.BAD_REQUEST, "예약 시작·종료 시간은 HH:mm 형식이어야 합니다. 예) 10:00"),

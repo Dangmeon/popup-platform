@@ -66,4 +66,14 @@ public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
     @Modifying
     @Query("DELETE FROM Favorite f WHERE f.popupStore.popId = :popId")
     int deleteFavoritesByPopId(@Param("popId") Long popId);
+
+    // 팝업 삭제 전 확인용 : 이 팝업에 입장 완료(ENTERED) 웨이팅이 있는지 (실제 방문 기록이라 남겨야 함)
+    @Query("SELECT CASE WHEN COUNT(w) > 0 THEN true ELSE false END FROM WaitingQueue w "
+            + "WHERE w.popupStore.popId = :popId AND w.waitingStatus = com.popq.platform.waiting.entity.WaitingStatus.ENTERED")
+    boolean existsEnteredWaitingByPopId(@Param("popId") Long popId);
+
+    // 팝업 삭제 전 : 이 팝업의 웨이팅 기록 삭제 (입장 완료가 없을 때만 호출됨 = 대기·호출·취소·만료 기록)
+    @Modifying
+    @Query("DELETE FROM WaitingQueue w WHERE w.popupStore.popId = :popId")
+    int deleteWaitingsByPopId(@Param("popId") Long popId);
 }

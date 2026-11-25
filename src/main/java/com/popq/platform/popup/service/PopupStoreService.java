@@ -166,6 +166,10 @@ public class PopupStoreService {
         if (productRepo.existsByPopId(popId)) {
             throw new PopupException(PopupErrorCode.POPUP_HAS_PRODUCTS);
         }
+        if (popupRepo.existsEnteredWaitingByPopId(popId)) { // 입장 완료 기록이 있으면 삭제 불가 -> 운영 취소 안내
+            throw new PopupException(PopupErrorCode.POPUP_HAS_ENTERED_WAITINGS);
+        }
+        popupRepo.deleteWaitingsByPopId(popId); // 나머지 웨이팅(대기·호출·취소·만료)은 같이 삭제
         popupRepo.deleteFavoritesByPopId(popId); // 찜은 같이 삭제 (삭제는 ADMIN만 가능)
         popupRepo.delete(popup);
     }
