@@ -1,5 +1,8 @@
 package com.popq.platform.waiting.service;
 
+import com.popq.platform.auth.entity.User;
+import com.popq.platform.auth.repository.UserRepository;
+import com.popq.platform.popup.service.PopupAccessService;
 import com.popq.platform.waiting.dto.AdminWaitingListResponse;
 import com.popq.platform.waiting.dto.CheckInRequest;
 import com.popq.platform.waiting.dto.WaitingRegisterRequest;
@@ -35,11 +38,14 @@ public class WaitingService {
     private final PopupStoreRepository popupStoreRepository;
     private final SimpMessagingTemplate messagingTemplate; // Spring이 제공하는 STOMP 메시지 발송 도구(WebSocket 메시지 전송용) 생성
     private final ApplicationEventPublisher eventPublisher;
+    private final UserRepository userRepository;
+    private final PopupAccessService popupAccessService;
 
     // 현장 대기열 등록
 
     @Transactional
-    public WaitingStatusResponse registerWaiting(WaitingRegisterRequest request) {
+    public WaitingStatusResponse registerWaiting(String username, WaitingRegisterRequest request) {
+        User loginUser = findLoginUser(username);
 
         // 팝업스토어 존재 여부 확인
         PopupStore popup = popupStoreRepository.findByIdWithPessimisticLock(request.getPopId()) // + 비관적 락 팝업 레포에서 정의 필요
@@ -76,6 +82,7 @@ public class WaitingService {
         // WaitingQueue 엔티티 생성 및 데이터베이스 저장
         WaitingQueue newWaiting = WaitingQueue.builder()
                 .popupStore(popup)
+                .user(loginUser)
                 .phone(request.getPhone())
                 .peopleCount(request.getPeopleCount())
                 .queueNumber(nextQueueNumber)
@@ -115,11 +122,14 @@ public class WaitingService {
 
     // 현재 대기 상태 조회 메소드(조회는 ReadOnly)
     @Transactional(readOnly = true) //readonly
-    public WaitingStatusResponse getWaitingStatus(Long waitingId) {
+    public WaitingStatusResponse getWaitingStatus(String username,Long waitingId) {
+        User loginUser = findLoginUser(username);
 
         // 대기열 내역 조회
         WaitingQueue queue = waitingQueueRepository.findById(waitingId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId)); // 없으면 예외 던지기
+
+        validateWaitingOwner(queue, loginUser);
 
         Long teamsAhead = null;
         Integer minutesPerTeam = null;
@@ -142,11 +152,14 @@ public class WaitingService {
 
     // 대기열 취소 메소드
     @Transactional
-    public WaitingStatusResponse cancelWaiting(Long waitingId) {
+    public WaitingStatusResponse cancelWaiting(String username, Long waitingId) {
+        User loginUser = findLoginUser(username);
 
         // 대기열 내역 조회
         WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+
+        validateWaitingOwner(waiting, loginUser);
 
         // 검증 및 CANCELLED로 상태 변경
         waiting.cancel();
@@ -169,10 +182,13 @@ public class WaitingService {
     // @param waitingId 대기열 ID
     // @param timeoutMinutes 입장 제한/유효 시간 (예: 10분)
     @Transactional
-    public WaitingStatusResponse callWaiting(Long waitingId, int timeoutMinutes) {
+    public WaitingStatusResponse callWaiting(String username, Long waitingId, int timeoutMinutes) {
         // 대기열 내역 조회
         WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
                 .orElseThrow(() -> new IllegalArgumentException("해당 대기열 정보를 찾을 수 없습니다. ID: " + waitingId));
+
+        User loginUser = popupAccessService.getLoginUser(username);
+        popupAccessService.checkAccess(waiting.getPopupStore(), loginUser);
 
         // 엔티티 상태 전이 (규칙 검증(WAITING 인지?) 및 calledAt, expiresAt 시각 설정)
         waiting.call(timeoutMinutes);
@@ -256,11 +272,33 @@ public class WaitingService {
     }
 
     @Transactional
-    public WaitingStatusResponse checkIn(CheckInRequest request) {
+    public WaitingStatusResponse checkIn(String username, CheckInRequest request) {
         // checkInCode에서 waitingId ("CHK-0005-0010" 일 경우 10) 파싱
         Long waitingId = parseWaitingIdFromCheckInCode(request.getCheckInCode());
+
+        WaitingQueue waiting = waitingQueueRepository.findById(waitingId)
+                .orElseThrow(() -> new WaitingException(WaitingErrorCode.WAITING_NOT_FOUND));
+
+        User loginUser = popupAccessService.getLoginUser(username);
+        popupAccessService.checkAccess(waiting.getPopupStore(), loginUser);
+
         // 만든 enterWaiting만 그대로 호출
         return enterWaiting(waitingId);
+    }
+
+    // 로그인 회원 조회
+    private User findLoginUser(String username) {
+        if (username == null || username.isBlank()) {
+            throw new WaitingException(WaitingErrorCode.UNAUTHORIZED);
+        }
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new WaitingException(WaitingErrorCode.UNAUTHORIZED));
+    }
+    // 본인의 대기열인지 검증
+    private void validateWaitingOwner(WaitingQueue waiting, User loginUser) {
+        if (waiting.getUser() == null || !waiting.getUser().getId().equals(loginUser.getId())) {
+            throw new WaitingException(WaitingErrorCode.FORBIDDEN_WAITING_ACCESS);
+        }
     }
 
     private Long parseWaitingIdFromCheckInCode(String checkInCode) { // 체크인 코드에서 waitingId 추출하는 메소드
@@ -276,10 +314,8 @@ public class WaitingService {
     }
 
     @Transactional(readOnly = true)
-    public AdminWaitingListResponse getAdminWaitingList(Long popId, WaitingStatus status) {
-        if (!popupStoreRepository.existsById(popId)) { // 팝업이 있는지?
-            throw new WaitingException(WaitingErrorCode.POPUP_NOT_FOUND);
-        }
+    public AdminWaitingListResponse getAdminWaitingList(String username, Long popId, WaitingStatus status) {
+        popupAccessService.checkPopupAccess(popId, username);
 
         LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
 
@@ -294,8 +330,8 @@ public class WaitingService {
         );
 
         // 통계 카운트 집계
-        int waitingCount = 0; // 대기 인원 카운팅
-        int calledCount = 0; // 호출된 인원 카운팅
+        int waitingCount = 0;
+        int calledCount = 0;
         for (WaitingQueue w : queues) {
             if (w.getWaitingStatus() == WaitingStatus.WAITING) {
                 waitingCount++;

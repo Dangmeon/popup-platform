@@ -32,6 +32,9 @@ public enum WaitingErrorCode {
     INVALID_STATUS_FOR_CALL(HttpStatus.BAD_REQUEST, "대기 중 상태일 때만 호출할 수 있습니다."),
     NOT_CALLED_YET(HttpStatus.BAD_REQUEST, "호출 상태인 대기 팀만 처리할 수 있습니다."),
 
+    // 403 forbidden
+    FORBIDDEN_WAITING_ACCESS(HttpStatus.FORBIDDEN, "본인의 대기 내역만 조회하거나 취소할 수 있습니다."),
+
     // 409 CONFLICT
     ALREADY_WAITING(HttpStatus.CONFLICT, "이미 해당 팝업스토어에 대기 등록된 연락처입니다."),
     POPUP_NOT_OPEN(HttpStatus.CONFLICT, "현재 대기 접수 시간이 아닙니다."),

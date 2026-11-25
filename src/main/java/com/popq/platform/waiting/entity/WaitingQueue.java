@@ -1,5 +1,6 @@
 package com.popq.platform.waiting.entity;
 
+import com.popq.platform.auth.entity.User;
 import com.popq.platform.popup.entity.PopupStore;
 import com.popq.platform.waiting.exception.WaitingErrorCode;
 import com.popq.platform.waiting.exception.WaitingException;
@@ -31,6 +32,10 @@ public class WaitingQueue {
     @JoinColumn(name = "pop_id", nullable = false)
     private PopupStore popupStore;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "member_id", nullable = true)
+    private User user;
+
     @Column(name = "phone", nullable = false, length = 20) // NOT NULL VARCHAR2(20)
     private String phone;
 
@@ -57,9 +62,10 @@ public class WaitingQueue {
     private LocalDateTime expiresAt;
 
     @Builder
-    public WaitingQueue(PopupStore popupStore, String phone, int peopleCount, Integer queueNumber) {
+    public WaitingQueue(PopupStore popupStore, String phone, User user, int peopleCount, Integer queueNumber) {
         this.popupStore = popupStore;
         this.phone = phone; // 연락처
+        this.user = user;
         this.peopleCount = peopleCount; // 인원수
         this.queueNumber = queueNumber; // 대기 번호
         this.waitingStatus = WaitingStatus.WAITING; // 기본값 'WAITING'

@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -27,26 +28,29 @@ public class WaitingController {
 
     @PostMapping
     public ResponseEntity<WaitingStatusResponse> registerWaiting(
+            @AuthenticationPrincipal String username,
             @Valid @RequestBody WaitingRegisterRequest request // WaitingRegisterRequest의 조건 검증 미충족시 400 bad request
     ) {
-        WaitingStatusResponse response = waitingService.registerWaiting(request);
+        WaitingStatusResponse response = waitingService.registerWaiting(username, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     // 조회
     @GetMapping("/{waitingId}")
     public ResponseEntity<WaitingStatusResponse> getWaitingStatus(
+            @AuthenticationPrincipal String username,
             @PathVariable("waitingId") Long waitingId
     ) {
-        WaitingStatusResponse response = waitingService.getWaitingStatus(waitingId);
+        WaitingStatusResponse response = waitingService.getWaitingStatus(username, waitingId);
         return ResponseEntity.ok(response); // 200
     }
     // 삭제
     @PatchMapping("/{waitingId}/cancel")
     public ResponseEntity<WaitingStatusResponse> cancelWaiting(
+            @AuthenticationPrincipal String username,
             @PathVariable("waitingId") Long waitingId
     ) {
-        WaitingStatusResponse response = waitingService.cancelWaiting(waitingId);
+        WaitingStatusResponse response = waitingService.cancelWaiting(username, waitingId);
         return ResponseEntity.ok(response);
     }
 }
