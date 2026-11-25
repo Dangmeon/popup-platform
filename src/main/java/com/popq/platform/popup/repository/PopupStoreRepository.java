@@ -4,6 +4,7 @@ import com.popq.platform.popup.entity.PopupStore;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -60,4 +61,19 @@ public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
                                     @Param("category") String category,
                                     @Param("sort") String sort,
                                     @Param("today") LocalDate today);
+
+    // 팝업 삭제 전 : 이 팝업의 찜(favorite)을 함께 삭제 (FK 때문에 남아 있으면 팝업 삭제 실패)
+    @Modifying
+    @Query("DELETE FROM Favorite f WHERE f.popupStore.popId = :popId")
+    int deleteFavoritesByPopId(@Param("popId") Long popId);
+
+    // 팝업 삭제 전 확인용 : 이 팝업에 입장 완료(ENTERED) 웨이팅이 있는지 (실제 방문 기록이라 남겨야 함)
+    @Query("SELECT CASE WHEN COUNT(w) > 0 THEN true ELSE false END FROM WaitingQueue w "
+            + "WHERE w.popupStore.popId = :popId AND w.waitingStatus = com.popq.platform.waiting.entity.WaitingStatus.ENTERED")
+    boolean existsEnteredWaitingByPopId(@Param("popId") Long popId);
+
+    // 팝업 삭제 전 : 이 팝업의 웨이팅 기록 삭제 (입장 완료가 없을 때만 호출됨 = 대기·호출·취소·만료 기록)
+    @Modifying
+    @Query("DELETE FROM WaitingQueue w WHERE w.popupStore.popId = :popId")
+    int deleteWaitingsByPopId(@Param("popId") Long popId);
 }
