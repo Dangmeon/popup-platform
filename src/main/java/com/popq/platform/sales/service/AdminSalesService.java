@@ -1,32 +1,35 @@
 package com.popq.platform.sales.service;
 
-import com.popq.platform.popup.exception.PopupException;
+
+import com.popq.platform.auth.entity.Role;
+import com.popq.platform.auth.entity.User;
+import com.popq.platform.auth.repository.UserRepository;
+import com.popq.platform.order.entity.OrderStatus;
+import com.popq.platform.order.repository.OrderItemRepository;
+import com.popq.platform.popup.entity.PopupStore;
+import com.popq.platform.popup.repository.PopupStoreRepository;
+import com.popq.platform.sales.dto.MonthlySalesResponse;
 import com.popq.platform.sales.dto.PopupSalesResponse;
 import com.popq.platform.sales.dto.SalesForecastResponse;
 import com.popq.platform.sales.dto.SalesSummaryResponse;
-import com.popq.platform.popup.entity.PopupStore;
-import com.popq.platform.auth.entity.Role;
-import com.popq.platform.auth.entity.User;
-import com.popq.platform.order.entity.OrderStatus;
-import com.popq.platform.order.repository.OrderItemRepository;
-import com.popq.platform.popup.repository.PopupStoreRepository;
+import com.popq.platform.sales.dto.WeekSalesResponse;
 import com.popq.platform.sales.exception.SalesErrorCode;
 import com.popq.platform.sales.exception.SalesException;
+import com.popq.platform.sales.repository.MonthlySalesProjection;
 import com.popq.platform.sales.repository.SalesSummaryProjection;
-import com.popq.platform.auth.repository.UserRepository;
+import com.popq.platform.sales.repository.WeeklySalesProjection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.YearMonth;
+import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -69,6 +72,10 @@ public class AdminSalesService {
         PopupStore popupStore = popupStoreRepository.findById(popId)
                 .orElseThrow(() -> new SalesException(SalesErrorCode.POPUP_NOT_FOUND));
 
+        if(user.getRole() != Role.ADMIN && user.getRole() != Role.MANAGER) {
+            throw new SalesException(SalesErrorCode.FORBIDDEN_ADMIN_ONLY);
+        }
+
         if (user.getRole() == Role.MANAGER) {
             if (popupStore.getManager() == null || !popupStore.getManager().getId().equals(user.getId())) {
                 throw new SalesException(SalesErrorCode.POPUP_ACCESS_DENIED);
@@ -84,6 +91,110 @@ public class AdminSalesService {
                 result.getTotalOrderCount(),
                 result.getTotalQuantity()
         );
+    }
+
+    public List<MonthlySalesResponse> getMonthlySales(String username) {
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new SalesException(SalesErrorCode.MEMBER_NOT_FOUND));
+      
+        if(user.getRole() != Role.ADMIN) {
+            throw new SalesException(SalesErrorCode.FORBIDDEN_ADMIN_ONLY);
+        }
+
+        YearMonth currentMonth = YearMonth.now();
+        YearMonth startMonth = currentMonth.minusMonths(3);
+
+        LocalDateTime start = startMonth.atDay(1).atStartOfDay();
+        LocalDateTime end = currentMonth.plusMonths(1).atDay(1).atStartOfDay();
+
+        List<MonthlySalesProjection> results = orderItemRepository.findMonthlySales(OrderStatus.PAID, start, end);
+
+        Map<String, Long> salesMap = new HashMap<>();
+
+        for(MonthlySalesProjection projection : results) {
+
+            String month = YearMonth.of(projection.getYear(), projection.getMonth()).toString();
+
+            salesMap.put(month, projection.getTotalSales());
+        }
+
+        return buildMonthlySales(startMonth, salesMap);
+    }
+
+    public List<WeekSalesResponse> getWeeklySales(String username, Long popId, LocalDate date) {
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new SalesException(SalesErrorCode.MEMBER_NOT_FOUND));
+
+        PopupStore popupStore = popupStoreRepository.findById(popId)
+                .orElseThrow(() -> new SalesException(SalesErrorCode.POPUP_NOT_FOUND));
+
+        if(user.getRole() != Role.ADMIN && user.getRole() != Role.MANAGER) {
+            throw new SalesException(SalesErrorCode.FORBIDDEN_ADMIN_ONLY);
+        }
+
+        if(user.getRole() == Role.MANAGER) {
+            if(popupStore.getManager() == null || !popupStore.getManager().getId().equals(user.getId())) {
+                throw new SalesException(SalesErrorCode.POPUP_ACCESS_DENIED);
+            }
+        }
+
+        // 선택한 주의 월요일
+        LocalDate selectedMonday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+
+        // 3주 전 월요일
+        LocalDate startMonday = selectedMonday.minusWeeks(3);
+
+        LocalDateTime start = startMonday.atStartOfDay();
+        LocalDateTime end = selectedMonday.plusWeeks(1).atStartOfDay();
+
+        List<WeeklySalesProjection> results = orderItemRepository.findWeeklyPopupSales(popId, OrderStatus.PAID, start, end);
+
+        // 일별 매출을 주별 매출로 합산
+        Map<LocalDate, Long> salesMap = new HashMap<>();
+
+        for(WeeklySalesProjection projection : results) {
+
+            LocalDate paymentDate = LocalDate.of(projection.getYear(), projection.getMonth(), projection.getDay());
+
+            LocalDate weekStart = paymentDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+
+            salesMap.merge(weekStart, projection.getTotalSales(), Long::sum);
+        }
+
+        return buildWeeklySales(startMonday, salesMap);
+    }
+
+    private List<MonthlySalesResponse> buildMonthlySales(YearMonth startMonth, Map<String, Long> salesMap) {
+
+        List<MonthlySalesResponse> monthlySales = new ArrayList<>();
+
+        for(int i = 0; i < 4; i++){
+
+            String month = startMonth.plusMonths(i).toString();
+            Long totalSales = salesMap.getOrDefault(month, 0L);
+            monthlySales.add(new MonthlySalesResponse(month, totalSales));
+        }
+
+        return monthlySales;
+    }
+
+    private List<WeekSalesResponse> buildWeeklySales(LocalDate startMonday, Map<LocalDate, Long> salesMap) {
+
+        List<WeekSalesResponse> weeklySales = new ArrayList<>();
+
+        for(int i = 0; i < 4; i++){
+
+            LocalDate weekStart = startMonday.plusWeeks(i);
+            LocalDate weekEnd = weekStart.plusDays(6);
+
+            long totalSales = salesMap.getOrDefault(weekStart, 0L);
+
+            weeklySales.add(new WeekSalesResponse(weekStart, weekEnd, totalSales));
+        }
+
+        return weeklySales;
     }
 
     /**

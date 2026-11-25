@@ -93,9 +93,10 @@ public interface AdminDashboardRepository extends JpaRepository<PopupStore, Long
     List<Order> findRecentOrders(@Param("managerId") Long managerId,
                                  @Param("pending") OrderStatus pending);
 
-    // 재고 부족 상품 (판매 종료된 상품 제외, 재고 적은 순)
+    // 재고 부족 상품 (판매 종료된 상품, 운영 취소된 팝업 상품 제외, 재고 적은 순)
     @Query("SELECT pr FROM Product pr JOIN pr.popupStore p LEFT JOIN p.manager m "
             + "WHERE pr.stock <= :threshold AND (pr.saleEnd IS NULL OR pr.saleEnd > :now) "
+            + "AND p.opStatus <> 'CANCELLED' "
             + "AND (:managerId IS NULL OR m.id = :managerId) "
             + "ORDER BY pr.stock ASC, pr.prdId ASC")
     List<Product> findLowStockProducts(@Param("managerId") Long managerId,
