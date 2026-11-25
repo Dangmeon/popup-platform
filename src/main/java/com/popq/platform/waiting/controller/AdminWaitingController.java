@@ -8,6 +8,7 @@ import com.popq.platform.waiting.service.WaitingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,8 +23,9 @@ public class AdminWaitingController {
      * POST /api/admin/waitings/{waitingId}/call
      */
     @PostMapping("/waitings/{waitingId}/call")
-    public ResponseEntity<WaitingStatusResponse> callWaiting(@PathVariable Long waitingId) {
-        WaitingStatusResponse response = waitingService.callWaiting(waitingId, 10); // 기본 10분 타이머 사용
+    public ResponseEntity<WaitingStatusResponse> callWaiting(@AuthenticationPrincipal String username,
+                                                             @PathVariable Long waitingId) {
+        WaitingStatusResponse response = waitingService.callWaiting(username, waitingId, 10); // 기본 10분 타이머 사용
         return ResponseEntity.ok(response);
     }
     /**  테스트 결과 (POST http://localhost:8080/api/admin/waitings/10/call)
@@ -45,8 +47,9 @@ public class AdminWaitingController {
      * POST /api/admin/waitings/checkIn
      */
     @PostMapping("/waitings/checkIn")
-    public ResponseEntity<WaitingStatusResponse> checkIn(@RequestBody @Valid CheckInRequest request) {
-        WaitingStatusResponse response = waitingService.checkIn(request);
+    public ResponseEntity<WaitingStatusResponse> checkIn(@AuthenticationPrincipal String username,
+                                                         @RequestBody @Valid CheckInRequest request) {
+        WaitingStatusResponse response = waitingService.checkIn(username, request);
         return ResponseEntity.ok(response);
     }
     /** 테스트 결과
@@ -89,10 +92,11 @@ public class AdminWaitingController {
      */
     @GetMapping("/popups/{popId}/waitings")
     public ResponseEntity<AdminWaitingListResponse> getAdminWaitingList(
+            @AuthenticationPrincipal String username,
             @PathVariable Long popId,
             @RequestParam(required = false) WaitingStatus status
     ) {
-        AdminWaitingListResponse response = waitingService.getAdminWaitingList(popId, status);
+        AdminWaitingListResponse response = waitingService.getAdminWaitingList(username, popId, status);
         return ResponseEntity.ok(response);
     }
     /** 테스트 결과
