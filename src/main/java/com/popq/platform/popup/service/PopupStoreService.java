@@ -166,6 +166,7 @@ public class PopupStoreService {
         if (productRepo.existsByPopId(popId)) {
             throw new PopupException(PopupErrorCode.POPUP_HAS_PRODUCTS);
         }
+        popupRepo.deleteFavoritesByPopId(popId); // 찜은 같이 삭제 (삭제는 ADMIN만 가능)
         popupRepo.delete(popup);
     }
 

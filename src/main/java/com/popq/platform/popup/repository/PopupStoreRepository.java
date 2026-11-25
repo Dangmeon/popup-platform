@@ -4,6 +4,7 @@ import com.popq.platform.popup.entity.PopupStore;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -60,4 +61,9 @@ public interface PopupStoreRepository extends JpaRepository<PopupStore, Long>  {
                                     @Param("category") String category,
                                     @Param("sort") String sort,
                                     @Param("today") LocalDate today);
+
+    // 팝업 삭제 전 : 이 팝업의 찜(favorite)을 함께 삭제 (FK 때문에 남아 있으면 팝업 삭제 실패)
+    @Modifying
+    @Query("DELETE FROM Favorite f WHERE f.popupStore.popId = :popId")
+    int deleteFavoritesByPopId(@Param("popId") Long popId);
 }
