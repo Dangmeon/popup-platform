@@ -198,6 +198,9 @@ public class PopupStoreService {
         // 시작 전 회차 및 해당 회차 예약 일괄 취소
         timeSlotService.cancelUpcomingSlotsByPopup(popId);
 
+        // 아래 웨이팅 일괄 UPDATE가 영속성 컨텍스트를 비우기 전에 회차·예약 취소를 먼저 DB에 반영
+        timeSlotRepo.flush();
+
         // 미입장 웨이팅(WAITING, CALLED) 일괄 취소
         int cancelledWaitings = waitingQueueRepo.bulkCancelActiveWaitingsByPopup(
                 popId,
