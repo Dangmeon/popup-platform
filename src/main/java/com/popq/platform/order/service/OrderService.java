@@ -48,6 +48,9 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(String username, OrderCreateRequest request) {
 
+        // 동일 상품 중복 요청 검증
+        validateDuplicateProducts(request.getItems());
+
         // 로그인 회원 조회
         User user = userRepository.findByUsernameForUpdate(username)
                 .orElseThrow(() -> new IllegalArgumentException("회원이 없습니다."));
@@ -294,6 +297,16 @@ public class OrderService {
 
         if (!order.getUser().getUsername().equals(username)) {
             throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+    }
+
+    private void validateDuplicateProducts(List<OrderItemRequest> items) {
+        Set<Long> productIds = new HashSet<>();
+
+        for (OrderItemRequest item : items) {
+            if (!productIds.add(item.getPrdId())) {
+                throw new OrderException(OrderErrorCode.DUPLICATE_PRODUCT);
+            }
         }
     }
 
