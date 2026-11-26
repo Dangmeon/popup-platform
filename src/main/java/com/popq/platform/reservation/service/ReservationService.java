@@ -6,6 +6,8 @@ import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.popq.platform.auth.entity.User;
+import com.popq.platform.exception.AuthErrorCode;
+import com.popq.platform.exception.AuthException;
 import com.popq.platform.timeslot.dto.TimeSlotChangedEvent;
 import com.popq.platform.common.redis.RedisExpirationKeyService;
 import com.popq.platform.reservation.dto.ReservationCreateRequest;
@@ -460,12 +462,12 @@ public class ReservationService {
 
     private User getUser(String username){
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("회원이 없습니다"));
+                .orElseThrow(() -> new AuthException(AuthErrorCode.USER_NOT_FOUND));
     }
 
     private void validateOwner(Reservation reservation, User user){
         if(!reservation.getUser().getId().equals(user.getId())){
-            throw new IllegalArgumentException("회원이 아닙니다.");
+            throw new AuthException(AuthErrorCode.ACCESS_DENIED);
         }
     }
 
