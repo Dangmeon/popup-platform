@@ -8,6 +8,7 @@ import com.popq.platform.order.entity.OrderItem;
 import com.popq.platform.order.entity.OrderStatus;
 import com.popq.platform.order.exception.OrderErrorCode;
 import com.popq.platform.order.exception.OrderException;
+import com.popq.platform.payment.service.PaymentOperationService;
 import com.popq.platform.product.entity.Product;
 import com.popq.platform.product.exception.ProductErrorCode;
 import com.popq.platform.product.exception.ProductException;
@@ -43,6 +44,8 @@ public class OrderService {
     private final PaymentService paymentService;
     private final CartService cartService;
     private final CouponService couponService;
+    private final PaymentOperationService paymentOperationService;
+
 
     // 주문 생성
     @Transactional
@@ -211,17 +214,19 @@ public class OrderService {
         }
 
         // PENDING 주문 취소 및 재고 복구
-        if(order.getOrderStatus() == OrderStatus.PENDING){
+        if (order.getOrderStatus() == OrderStatus.PENDING) {
+
+            // 결제 결과가 확정되지 않은 주문은 취소 방지
+            if (paymentOperationService.hasUnresolvedConfirm(orderId)) {
+                throw new OrderException(OrderErrorCode.PAYMENT_PROCESSING);
+            }
 
             restoreStock(order);
 
-            // 주문 상태 CANCELED 변경
             order.cancel();
 
-            // TODO Redis TTL Key 삭제
             redisExpirationKeyService.delete("order:pending:" + orderId);
 
-            // 주문 응답 반환
             return OrderResponse.from(order);
         }
 

@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class PaymentOperationService {
@@ -81,6 +83,15 @@ public class PaymentOperationService {
         }
 
         operation.fail(failureReason);
+    }
+
+    // 결제 승인 결과가 아직 확정되지 않은 주문인지 확인
+    @Transactional(readOnly = true)
+    public boolean hasUnresolvedConfirm(Long orderId) {
+        return paymentOperationRepository.existsByOrderIdAndOperationTypeAndOperationStatusIn(
+                orderId, PaymentOperationType.CONFIRM,
+                List.of(PaymentOperationStatus.PENDING, PaymentOperationStatus.RECOVERY_REQUIRED)
+        );
     }
 
     private PaymentOperation getOperationForUpdate(Long operationId) {

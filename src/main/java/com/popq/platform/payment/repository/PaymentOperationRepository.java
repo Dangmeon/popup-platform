@@ -2,6 +2,7 @@ package com.popq.platform.payment.repository;
 
 import com.popq.platform.payment.entity.PaymentOperation;
 import com.popq.platform.payment.entity.PaymentOperationStatus;
+import com.popq.platform.payment.entity.PaymentOperationType;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -34,5 +35,9 @@ public interface PaymentOperationRepository extends JpaRepository<PaymentOperati
     List<Long> findRecoveryTargetIds(
             @Param("statuses") List<PaymentOperationStatus> statuses,
             @Param("before") LocalDateTime before
+    );
+
+    boolean existsByOrderIdAndOperationTypeAndOperationStatusIn(
+            Long orderId, PaymentOperationType operationType, List<PaymentOperationStatus> statuses
     );
 }
