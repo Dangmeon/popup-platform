@@ -42,9 +42,11 @@ public class PaymentService {
     private String tossSecretKey;
 
     @Transactional
-    public PaymentResponse confirmPayment(PaymentRequest request) {
+    public PaymentResponse confirmPayment(String username, PaymentRequest request) {
 
         Order order = getOrderForUpdate(request.getOrderId());
+
+        validateOrderOwner(order, username);
 
         validatePayment(order, request);
 
@@ -172,6 +174,12 @@ public class PaymentService {
 
         if (payment.getPaymentStatus() != PaymentStatus.PAID) {
             throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
+        }
+    }
+
+    private void validateOrderOwner(Order order, String username) {
+        if (!order.getUser().getUsername().equals(username)) {
+            throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
         }
     }
 }
