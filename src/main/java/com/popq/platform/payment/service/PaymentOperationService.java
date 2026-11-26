@@ -1,5 +1,10 @@
 package com.popq.platform.payment.service;
 
+import com.popq.platform.order.entity.Order;
+import com.popq.platform.order.entity.OrderStatus;
+import com.popq.platform.order.exception.OrderErrorCode;
+import com.popq.platform.order.exception.OrderException;
+import com.popq.platform.order.repository.OrderRepository;
 import com.popq.platform.payment.entity.PaymentOperation;
 import com.popq.platform.payment.entity.PaymentOperationStatus;
 import com.popq.platform.payment.entity.PaymentOperationType;
@@ -18,6 +23,7 @@ import java.util.List;
 public class PaymentOperationService {
 
     private final PaymentOperationRepository paymentOperationRepository;
+    private final OrderRepository orderRepository;
 
     // 결제 작업 이력을 별도 트랜잭션으로 저장
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -102,5 +108,41 @@ public class PaymentOperationService {
     private PaymentOperation getOperationForUpdate(Long operationId) {
         return paymentOperationRepository.findByIdForUpdate(operationId)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_NOT_FOUND));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordRecoveryFailure(Long operationId, String failureReason) {
+        PaymentOperation operation = getOperationForUpdate(operationId);
+
+        if (operation.getOperationStatus() == PaymentOperationStatus.COMPLETED
+                || operation.getOperationStatus() == PaymentOperationStatus.FAILED) {
+            return;
+        }
+
+        operation.increaseRetryCount();
+
+        if (operation.getOperationStatus() != PaymentOperationStatus.COMPENSATION_REQUIRED) {
+            operation.requireRecovery(failureReason);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void requestCompensation(Long orderId, Long operationId) {
+
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        PaymentOperation operation = getOperationForUpdate(operationId);
+
+        if (!operation.getOrderId().equals(orderId) || operation.getOperationType() != PaymentOperationType.CONFIRM) {
+            throw new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_MISMATCH);
+        }
+
+        if (operation.getOperationStatus() != PaymentOperationStatus.RECOVERY_REQUIRED
+                || order.getOrderStatus() == OrderStatus.PAID) {
+            throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        operation.requireCompensation("내부 결제 복구 실패로 인한 보상 취소 요청");
     }
 }
