@@ -14,13 +14,19 @@ import com.popq.platform.order.exception.OrderException;
 import com.popq.platform.order.redis.OrderExpirationService;
 import com.popq.platform.order.repository.OrderItemRepository;
 import com.popq.platform.order.repository.OrderRepository;
+import com.popq.platform.order.service.OrderExpirationScheduler;
 import com.popq.platform.order.service.OrderService;
 import com.popq.platform.payment.dto.PaymentRequest;
 import com.popq.platform.payment.dto.PaymentResponse;
 import com.popq.platform.payment.entity.Payment;
 import com.popq.platform.payment.entity.PaymentStatus;
+import com.popq.platform.payment.entity.PaymentOperation;
+import com.popq.platform.payment.entity.PaymentOperationStatus;
+import com.popq.platform.payment.entity.PaymentOperationType;
 import com.popq.platform.payment.repository.PaymentRepository;
+import com.popq.platform.payment.repository.PaymentOperationRepository;
 import com.popq.platform.payment.service.PaymentService;
+import com.popq.platform.payment.service.PaymentReconciliationScheduler;
 import com.popq.platform.popup.entity.PopupStore;
 import com.popq.platform.popup.repository.PopupStoreRepository;
 import com.popq.platform.product.entity.Product;
@@ -51,7 +57,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "spring.datasource.hikari.maximum-pool-size=20",
+        "logging.level.com.zaxxer.hikari=DEBUG"
+})
 class PaymentConcurrencyTest {
 
     @Autowired
@@ -65,6 +74,9 @@ class PaymentConcurrencyTest {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private PaymentOperationRepository paymentOperationRepository;
 
     @Autowired
     private OrderRepository orderRepository;
@@ -90,6 +102,14 @@ class PaymentConcurrencyTest {
     // 실제 Toss API 호출 방지
     @MockitoBean
     private RestClient restClient;
+
+    // 자동 복구 스케줄러의 테스트 개입 방지
+    @MockitoBean
+    private PaymentReconciliationScheduler paymentReconciliationScheduler;
+
+    // 자동 주문 만료 스케줄러의 테스트 개입 방지
+    @MockitoBean
+    private OrderExpirationScheduler orderExpirationScheduler;
 
     // 공통 테스트 데이터
     private static final int UNIT_PRICE = 10000;
@@ -128,6 +148,13 @@ class PaymentConcurrencyTest {
         // Redis 주문 만료 키 삭제
         for (Order order : orders) {
             stringRedisTemplate.delete("order:pending:" + order.getOrderId());
+        }
+
+        // 독립 트랜잭션으로 저장된 결제 처리 이력 삭제
+        for (Order order : orders) {
+            List<PaymentOperation> operations = paymentOperationRepository.findAllByOrderId(order.getOrderId());
+
+            paymentOperationRepository.deleteAll(operations);
         }
 
         // 외래 키 제약조건을 고려하여 결제 정보 먼저 삭제
@@ -322,6 +349,13 @@ class PaymentConcurrencyTest {
                 .count();
     }
 
+    // 테스트 주문에 연결된 실제 결제 처리 이력 개수 조회
+    private long getTestOperationCount() {
+        return findTestOrders().stream()
+                .mapToLong(order -> paymentOperationRepository.findAllByOrderId(order.getOrderId()).size())
+                .sum();
+    }
+
     // Toss API Mock 설정
 
     // 결제 승인 및 취소 API 성공 응답 설정
@@ -408,7 +442,7 @@ class PaymentConcurrencyTest {
     }
 
     @Test
-    @DisplayName("동일 주문을 동시에 결제 승인해도 결제는 한 번만 처리된다")
+    @DisplayName("동일 주문을 동시에 결제 승인해도 실제 결제는 한 번만 처리되고 동일한 결제 정보가 반환된다")
     void confirmPayment_concurrentDuplicate() throws Exception {
 
         int threadCount = 10;
@@ -430,12 +464,15 @@ class PaymentConcurrencyTest {
         assertEquals(initialStock - quantity, getCurrentStock());
 
         assertTrue(paymentRepository.findByOrder_OrderId(orderId).isEmpty());
+        assertTrue(paymentOperationRepository.findAllByOrderId(orderId).isEmpty());
 
         // Toss 결제 승인 성공 응답 설정
         mockTossApiSuccess();
 
         AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger rejectedCount = new AtomicInteger(0);
+
+        // 모든 요청의 결제 응답 저장
+        ConcurrentLinkedQueue<PaymentResponse> responses = new ConcurrentLinkedQueue<>();
 
         List<Runnable> tasks = new ArrayList<>();
 
@@ -445,35 +482,27 @@ class PaymentConcurrencyTest {
             PaymentRequest request = createPaymentRequest(tossOrderId, paymentKey, order.totalPrice());
 
             tasks.add(() -> {
-                try {
-                    PaymentResponse response = paymentService.confirmPayment(request);
+                PaymentResponse response = paymentService.confirmPayment(user.getUsername(), request);
 
-                    assertNotNull(response.paymentId());
-                    assertEquals(orderId, response.orderId());
-                    assertEquals(paymentKey, response.paymentKey());
-                    assertEquals(order.totalPrice(), response.amount());
-                    assertEquals(PaymentStatus.PAID, response.paymentStatus());
+                assertNotNull(response.paymentId());
+                assertEquals(orderId, response.orderId());
+                assertEquals(paymentKey, response.paymentKey());
+                assertEquals(order.totalPrice(), response.amount());
+                assertEquals(PaymentStatus.PAID, response.paymentStatus());
 
-                    successCount.incrementAndGet();
+                responses.add(response);
 
-                } catch (OrderException e) {
-
-                    // 이미 결제된 주문은 승인 불가능
-                    assertEquals(OrderErrorCode.INVALID_ORDER_STATUS, e.getErrorCode());
-
-                    rejectedCount.incrementAndGet();
-                }
+                successCount.incrementAndGet();
             });
         }
 
         executeConcurrently(tasks);
 
-        // 결제 승인 1건만 성공
-        assertEquals(1, successCount.get());
-        assertEquals(9, rejectedCount.get());
-        assertEquals(threadCount, successCount.get() + rejectedCount.get());
+        // 멱등성 처리에 의해 모든 결제 요청 정상 응답
+        assertEquals(threadCount, successCount.get());
+        assertEquals(threadCount, responses.size());
 
-        // Toss 결제 승인 API도 한 번만 호출
+        // Toss 결제 승인 API는 한 번만 호출
         assertEquals(1, confirmApiCount.get());
         assertEquals(0, cancelApiCount.get());
 
@@ -495,9 +524,34 @@ class PaymentConcurrencyTest {
         assertNotNull(savedPayment.getPaidAt());
         assertNull(savedPayment.getCanceledAt());
 
+        // 모든 요청에 동일한 결제 정보가 반환되는지 검증
+        for (PaymentResponse response : responses) {
+            assertEquals(savedPayment.getPaymentId(), response.paymentId());
+            assertEquals(savedPayment.getPaymentKey(), response.paymentKey());
+            assertEquals(savedPayment.getAmount(), response.amount());
+            assertEquals(PaymentStatus.PAID, response.paymentStatus());
+        }
+
         // 중복 결제 데이터 생성 방지
         assertEquals(1, findTestOrders().size());
         assertEquals(1, getTestPaymentCount());
+
+        // 실제 결제 처리 이력 검증
+        List<PaymentOperation> operations = paymentOperationRepository.findAllByOrderId(orderId);
+
+        assertEquals(1, operations.size());
+        assertEquals(1, getTestOperationCount());
+
+        PaymentOperation operation = operations.get(0);
+
+        assertNotNull(operation.getOperationId());
+        assertEquals(orderId, operation.getOrderId());
+        assertEquals(tossOrderId, operation.getTossOrderId());
+        assertEquals(paymentKey, operation.getPaymentKey());
+        assertEquals(order.totalPrice(), operation.getAmount());
+        assertEquals("confirm-" + tossOrderId, operation.getIdempotencyKey());
+        assertEquals(PaymentOperationType.CONFIRM, operation.getOperationType());
+        assertEquals(PaymentOperationStatus.COMPLETED, operation.getOperationStatus());
 
         // 결제 과정에서 재고가 추가 차감되지 않아야 함
         int finalStock = getCurrentStock();
@@ -507,16 +561,18 @@ class PaymentConcurrencyTest {
         assertEquals(quantity, activeQuantity);
         assertEquals(initialStock, finalStock + activeQuantity);
 
-        // 결제 완료 후 Redis 만료 키 삭제 검증
+        // DB 커밋 이후 Redis 만료 키 삭제 검증
         assertFalse(Boolean.TRUE.equals(stringRedisTemplate.hasKey("order:pending:" + orderId)));
 
         // 테스트 결과 출력
-        System.out.println("===== 중복 결제 승인 방지 동시성 테스트 결과 =====");
+        System.out.println("===== 결제 승인 멱등성 동시성 테스트 결과 =====");
         System.out.println("전체 결제 요청: " + threadCount);
-        System.out.println("결제 승인 성공: " + successCount.get());
-        System.out.println("결제 승인 거절: " + rejectedCount.get());
+        System.out.println("정상 응답: " + successCount.get());
         System.out.println("Toss 승인 API 호출 횟수: " + confirmApiCount.get());
         System.out.println("실제 DB 결제 개수: " + getTestPaymentCount());
+        System.out.println("실제 결제 처리 이력 개수: " + getTestOperationCount());
+        System.out.println("결제 처리 이력 상태: " + operation.getOperationStatus());
+        System.out.println("동일 결제 ID 반환 여부: " + responses.stream().allMatch(response -> savedPayment.getPaymentId().equals(response.paymentId())));
         System.out.println("최종 주문 상태: " + savedOrder.getOrderStatus());
         System.out.println("최종 결제 상태: " + savedPayment.getPaymentStatus());
         System.out.println("결제 금액: " + savedPayment.getAmount());
@@ -572,7 +628,7 @@ class PaymentConcurrencyTest {
         // Thread A: 결제 승인
         tasks.add(() -> {
             try {
-                paymentService.confirmPayment(request);
+                paymentService.confirmPayment(expiredUser.getUsername(), request);
 
                 confirmSuccessCount.incrementAndGet();
 
@@ -620,6 +676,10 @@ class PaymentConcurrencyTest {
         assertTrue(paymentRepository.findByOrder_OrderId(expiredOrderId).isEmpty());
         assertEquals(0, getTestPaymentCount());
 
+        // 만료 주문은 결제 처리 이력도 생성되지 않아야 함
+        assertTrue(paymentOperationRepository.findAllByOrderId(expiredOrderId).isEmpty());
+        assertEquals(0, getTestOperationCount());
+
         // 다른 정상 주문은 영향을 받지 않아야 함
         Order normalResult = orderRepository.findById(normalOrder.orderId()).orElseThrow();
 
@@ -641,9 +701,7 @@ class PaymentConcurrencyTest {
         assertEquals(2, findTestOrders().size());
 
         // 정상 주문의 Redis 만료 키 유지
-        assertTrue(Boolean.TRUE.equals(
-                stringRedisTemplate.hasKey("order:pending:" + normalOrder.orderId())
-        ));
+        assertTrue(Boolean.TRUE.equals(stringRedisTemplate.hasKey("order:pending:" + normalOrder.orderId())));
 
         // 테스트 결과 출력
         System.out.println("===== 결제 승인 및 주문 만료 동시성 테스트 결과 =====");
@@ -653,12 +711,14 @@ class PaymentConcurrencyTest {
         System.out.println("만료 서비스 정상 종료: " + expireCompletedCount.get());
         System.out.println("Toss 승인 API 호출 횟수: " + confirmApiCount.get());
         System.out.println("실제 DB 결제 개수: " + getTestPaymentCount());
+        System.out.println("실제 결제 처리 이력 개수: " + getTestOperationCount());
         System.out.println("만료 대상 주문 상태: " + expiredResult.getOrderStatus());
         System.out.println("정상 주문 상태: " + normalResult.getOrderStatus());
         System.out.println("처리 전 재고: " + beforeStock);
         System.out.println("실제 복구 재고: " + restoredStock);
         System.out.println("최종 재고: " + finalStock);
         System.out.println("활성 주문 수량 합계: " + activeQuantity);
+        System.out.println("정상 주문 Redis 키 존재 여부: " + stringRedisTemplate.hasKey("order:pending:" + normalOrder.orderId()));
     }
 
     @Test
@@ -690,7 +750,7 @@ class PaymentConcurrencyTest {
         PaymentRequest request = createPaymentRequest(targetOrder.tossOrderId(), paymentKey, targetOrder.totalPrice());
 
         // 실제 PaymentService를 통해 결제 완료
-        PaymentResponse paidResponse = paymentService.confirmPayment(request);
+        PaymentResponse paidResponse = paymentService.confirmPayment(cancelUser.getUsername(), request);
 
         assertEquals(PaymentStatus.PAID, paidResponse.paymentStatus());
         assertEquals(1, confirmApiCount.get());
@@ -703,6 +763,15 @@ class PaymentConcurrencyTest {
 
         Long originalPaymentId = paidPayment.getPaymentId();
         LocalDateTime originalPaidAt = paidPayment.getPaidAt();
+
+        // 사전 결제 승인 처리 이력 검증
+        List<PaymentOperation> beforeOperations = paymentOperationRepository.findAllByOrderId(targetOrderId);
+
+        assertEquals(1, beforeOperations.size());
+        assertEquals(PaymentOperationType.CONFIRM, beforeOperations.get(0).getOperationType());
+        assertEquals(PaymentOperationStatus.COMPLETED, beforeOperations.get(0).getOperationStatus());
+
+        Long originalConfirmOperationId = beforeOperations.get(0).getOperationId();
 
         // 초기 재고 10 - 정상 주문 3 - 결제 완료 주문 2
         int beforeStock = getCurrentStock();
@@ -792,6 +861,50 @@ class PaymentConcurrencyTest {
         assertEquals(2, findTestOrders().size());
         assertEquals(1, getTestPaymentCount());
 
+        // 실제 결제 승인 및 취소 처리 이력 검증
+        List<PaymentOperation> operations = paymentOperationRepository.findAllByOrderId(targetOrderId);
+
+        assertEquals(2, operations.size());
+        assertEquals(2, getTestOperationCount());
+
+        PaymentOperation confirmOperation = operations.stream()
+                .filter(operation -> operation.getOperationType() == PaymentOperationType.CONFIRM)
+                .findFirst()
+                .orElseThrow();
+
+        PaymentOperation cancelOperation = operations.stream()
+                .filter(operation -> operation.getOperationType() == PaymentOperationType.CANCEL)
+                .findFirst()
+                .orElseThrow();
+
+        // 기존 결제 승인 처리 이력 유지
+        assertEquals(originalConfirmOperationId, confirmOperation.getOperationId());
+        assertEquals(PaymentOperationStatus.COMPLETED, confirmOperation.getOperationStatus());
+        assertEquals(targetOrderId, confirmOperation.getOrderId());
+        assertEquals(targetOrder.tossOrderId(), confirmOperation.getTossOrderId());
+        assertEquals(paymentKey, confirmOperation.getPaymentKey());
+        assertEquals(targetOrder.totalPrice(), confirmOperation.getAmount());
+        assertEquals("confirm-" + targetOrder.tossOrderId(), confirmOperation.getIdempotencyKey());
+
+        // 결제 취소 처리 이력 한 건만 생성되었는지 검증
+        assertNotNull(cancelOperation.getOperationId());
+        assertNotEquals(confirmOperation.getOperationId(), cancelOperation.getOperationId());
+        assertEquals(PaymentOperationStatus.COMPLETED, cancelOperation.getOperationStatus());
+        assertEquals(targetOrderId, cancelOperation.getOrderId());
+        assertEquals(targetOrder.tossOrderId(), cancelOperation.getTossOrderId());
+        assertEquals(paymentKey, cancelOperation.getPaymentKey());
+        assertEquals(targetOrder.totalPrice(), cancelOperation.getAmount());
+        assertEquals("cancel-" + paymentKey, cancelOperation.getIdempotencyKey());
+
+        // 다른 정상 주문의 결제 처리 이력은 존재하지 않아야 함
+        assertTrue(paymentOperationRepository.findAllByOrderId(normalOrder.orderId()).isEmpty());
+
+        // 정상 주문의 Redis 만료 키 유지
+        assertTrue(Boolean.TRUE.equals(stringRedisTemplate.hasKey("order:pending:" + normalOrder.orderId())));
+
+        // 결제 완료 후 삭제된 Redis 만료 키가 다시 생성되지 않아야 함
+        assertFalse(Boolean.TRUE.equals(stringRedisTemplate.hasKey("order:pending:" + targetOrderId)));
+
         // 테스트 결과 출력
         System.out.println("===== 중복 결제 취소 방지 동시성 테스트 결과 =====");
         System.out.println("전체 취소 요청: " + threadCount);
@@ -800,6 +913,9 @@ class PaymentConcurrencyTest {
         System.out.println("Toss 승인 API 호출 횟수: " + confirmApiCount.get());
         System.out.println("Toss 취소 API 호출 횟수: " + cancelApiCount.get());
         System.out.println("실제 DB 결제 개수: " + getTestPaymentCount());
+        System.out.println("실제 결제 처리 이력 개수: " + getTestOperationCount());
+        System.out.println("승인 처리 이력 상태: " + confirmOperation.getOperationStatus());
+        System.out.println("취소 처리 이력 상태: " + cancelOperation.getOperationStatus());
         System.out.println("최종 주문 상태: " + cancelledOrder.getOrderStatus());
         System.out.println("최종 결제 상태: " + cancelledPayment.getPaymentStatus());
         System.out.println("정상 주문 상태: " + normalResult.getOrderStatus());
