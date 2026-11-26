@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -35,6 +36,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -732,6 +734,351 @@ public class ReservationServiceTest {
         verifyNoInteractions(
                 timeSlotRepository,
                 redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    // ==================== 예약 확정 ====================
+
+    @Test
+    @DisplayName("존재하지 않는 예약은 확정할 수 없다")
+    void confirmReservation_reservationNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.empty());
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.confirmReservation(username, reservationId)
+        );
+
+        assertEquals(ReservationErrorCode.RESERVATION_NOT_FOUND, exception.getErrorCode());
+
+        verify(reservationRepository).findByIdForUpdate(reservationId);
+
+        verifyNoInteractions(
+                userRepository,
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원은 예약을 확정할 수 없다")
+    void confirmReservation_userNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+
+        Reservation reservation = mock(Reservation.class);
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+
+        AuthException exception = assertThrows(
+                AuthException.class,
+                () -> reservationService.confirmReservation(username, reservationId)
+        );
+
+        assertEquals(AuthErrorCode.USER_NOT_FOUND, exception.getErrorCode());
+
+        verify(reservationRepository).findByIdForUpdate(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("다른 회원의 예약은 확정할 수 없다")
+    void confirmReservation_accessDenied() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long ownerId = 2L;
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        User owner = mock(User.class);
+
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+
+        when(reservation.getUser()).thenReturn(owner);
+        when(owner.getId()).thenReturn(ownerId);
+
+        AuthException exception = assertThrows(
+                AuthException.class,
+                () -> reservationService.confirmReservation(username, reservationId)
+        );
+
+        assertEquals(AuthErrorCode.ACCESS_DENIED, exception.getErrorCode());
+
+        verify(userRepository).findByUsername(username);
+        verify(reservationRepository).findByIdForUpdate(reservationId);
+
+        // 예약 소유자 검증이 실행되지 않았는지 확인
+        verify(reservation).getUser();
+        verify(user).getId();
+        verify(owner).getId();
+
+        // 예약 상태 및 만료 여부 검증 미실행 확인
+        verify(reservation, never()).getReservationStatus();
+        verify(reservation, never()).getExpiresAt();
+
+        // 예약 확정 처리가 실행되지 않았는지 확인
+        verify(reservation, never()).confirm(anyString());
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ReservationStatus.class,
+            names = {"HOLD"},
+            mode = EnumSource.Mode.EXCLUDE
+    )
+    @DisplayName("HOLD 상태가 아닌 예약은 확정할 수 없다")
+    void confirmReservation_invalidStatus(ReservationStatus status) {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+
+        when(reservation.getReservationStatus()).thenReturn(status);
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.confirmReservation(username, reservationId)
+        );
+
+        assertEquals(ReservationErrorCode.INVALID_RESERVATION_STATUS, exception.getErrorCode());
+
+        // 예약 및 회원 조회 확인
+        verify(reservationRepository).findByIdForUpdate(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        // 예약 소유자 검증 확인
+        verify(reservation).getUser();
+        verify(user, times(2)).getId();
+
+        verify(reservation).getReservationStatus();
+
+        // 예약 만료 여부 검증 미실행 확인
+        verify(reservation, never()).getExpiresAt();
+
+        // 예약 확정 처리 미실행 확인
+        verify(reservation, never()).confirm(anyString());
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("만료된 예약은 확정하지 않고 만료 처리한다")
+    void confirmReservation_expired() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        LocalDateTime expiresAt = LocalDateTime.now().minusMinutes(1);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+
+        // 예약 및 회원 조회 성공
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        // 예약 소유자 검증 통과
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+
+        // 예약 상태 및 만료시간 설정
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.HOLD);
+
+        when(reservation.getExpiresAt()).thenReturn(expiresAt);
+
+        // 응답 DTO 변환에 필요한 데이터 설정
+        when(reservation.getReservationId()).thenReturn(reservationId);
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+        when(reservation.getPeopleCount()).thenReturn(2);
+        when(reservation.getQrToken()).thenReturn(null);
+
+        // 만료 서비스가 예약 상태를 변경하는 상황을 모의 처리
+        doAnswer(invocation -> {
+            when(reservation.getReservationStatus()).thenReturn(ReservationStatus.EXPIRED);
+            return null;
+        }).when(reservationExpirationService).expireReservation(reservationId);
+
+        ReservationResponse response = reservationService.confirmReservation(username, reservationId);
+
+        assertNotNull(response);
+
+        // 응답 DTO 검증
+        assertEquals(reservationId, response.reservationId());
+        assertEquals(timeSlotId, response.timeSlotId());
+        assertEquals(2, response.peopleCount());
+        assertEquals(ReservationStatus.EXPIRED, response.reservationStatus());
+        assertEquals(expiresAt, response.expiresAt());
+        assertNull(response.qrToken());
+
+        // 예약 및 회원 조회 확인
+        verify(reservationRepository).findByIdForUpdate(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        // 예약 소유자 검증 확인
+        verify(reservation).getUser();
+        verify(user, times(2)).getId();
+
+        // 예약 상태 및 만료시간 조회 확인
+        verify(reservation, atLeastOnce()).getReservationStatus();
+        verify(reservation, atLeastOnce()).getExpiresAt();
+
+        // 예약 만료 서비스 호출 확인
+        verify(reservationExpirationService).expireReservation(reservationId);
+
+        // 예약 확정 처리 미실행 확인
+        verify(reservation, never()).confirm(anyString());
+
+        // 불필요한 직접 호출 미실행 확인
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("정상 예약 확정 시 CONFIRMED 상태로 변경하고 QR 토큰을 발급한다")
+    void confirmReservation_success() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+        int peopleCount = 2;
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(5);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+
+        // 예약 및 회원 조회 성공
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        // 예약 소유자 검증 통과
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+
+        // 예약 상태 및 만료시간 검증 통과
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.HOLD);
+
+        when(reservation.getExpiresAt()).thenReturn(expiresAt);
+
+        // 응답 DTO 변환에 필요한 데이터 설정
+        when(reservation.getReservationId()).thenReturn(reservationId);
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+        when(reservation.getPeopleCount()).thenReturn(peopleCount);
+
+        // 예약 확정에 따른 상태 변경 및 QR 토큰 저장 모의 처리
+        doAnswer(invocation -> {
+
+            String token = invocation.getArgument(0);
+
+            when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+
+            when(reservation.getQrToken()).thenReturn(token);
+
+            return null;
+
+        }).when(reservation).confirm(anyString());
+
+        ReservationResponse response = reservationService.confirmReservation(username, reservationId);
+
+        assertNotNull(response);
+
+        // confirm()에 전달된 QR 토큰 캡처
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+
+        verify(reservation).confirm(tokenCaptor.capture());
+
+        String qrToken = tokenCaptor.getValue();
+
+        // QR 토큰 검증
+        assertNotNull(qrToken);
+        assertFalse(qrToken.isBlank());
+
+        // UUID 형식인지 확인
+        assertDoesNotThrow(() -> {UUID.fromString(qrToken);});
+
+        // 응답 DTO 검증
+        assertEquals(reservationId, response.reservationId());
+        assertEquals(timeSlotId, response.timeSlotId());
+        assertEquals(peopleCount, response.peopleCount());
+        assertEquals(
+                ReservationStatus.CONFIRMED,
+                response.reservationStatus()
+        );
+        assertEquals(expiresAt, response.expiresAt());
+        assertEquals(qrToken, response.qrToken());
+
+        // 예약 및 회원 조회 확인
+        verify(reservationRepository).findByIdForUpdate(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        // 예약 소유자 검증 확인
+        verify(reservation).getUser();
+        verify(user, times(2)).getId();
+
+        // 예약 상태 및 만료시간 조회 확인
+        verify(reservation, atLeastOnce()).getReservationStatus();
+        verify(reservation, atLeastOnce()).getExpiresAt();
+
+        // Redis TTL Key 삭제 확인
+        verify(redisExpirationKeyService).delete("reservation:hold:" + reservationId);
+
+        // 별도의 예약 저장 호출이 발생하지 않는지 확인
+        verify(reservationRepository, never()).save(any());
+
+        // 불필요한 후속 처리 미실행 확인
+        verifyNoInteractions(
+                timeSlotRepository,
                 reservationExpirationService,
                 eventPublisher
         );
