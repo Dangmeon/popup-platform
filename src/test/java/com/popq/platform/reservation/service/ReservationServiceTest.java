@@ -36,6 +36,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -2216,6 +2217,441 @@ public class ReservationServiceTest {
                 redisExpirationKeyService,
                 reservationExpirationService,
                 eventPublisher
+        );
+    }
+
+    // ================ 예약 취소 ====================
+
+    @Test
+    @DisplayName("존재하지 않는 예약은 취소할 수 없다")
+    void cancelReservation_reservationNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+
+        // 존재하지 않는 예약으로 설정
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.empty());
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.cancelReservation(username, reservationId)
+        );
+
+        assertEquals(
+                ReservationErrorCode.RESERVATION_NOT_FOUND,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+
+        verifyNoInteractions(
+                userRepository,
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원은 예약을 취소할 수 없다")
+    void cancelReservation_userNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+
+        Reservation reservation = mock(Reservation.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+
+        AuthException exception = assertThrows(
+                AuthException.class,
+                () -> reservationService.cancelReservation(username, reservationId)
+        );
+
+        assertEquals(
+                AuthErrorCode.USER_NOT_FOUND,
+                exception.getErrorCode()
+        );
+
+        // 예약 및 회원 조회 확인
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        // 회원 조회 실패 이후 소유자 및 상태 검증 미실행
+        verify(reservation, never()).getUser();
+        verify(reservation, never()).getReservationStatus();
+
+        // 예약 취소 미실행
+        verify(reservation, never()).cancel();
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("다른 회원의 예약은 취소할 수 없다")
+    void cancelReservation_accessDenied() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+
+        Long userId = 1L;
+        Long ownerId = 2L;
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        User owner = mock(User.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        // 로그인 회원과 예약 소유자가 다른 상황
+        when(user.getId()).thenReturn(userId);
+        when(owner.getId()).thenReturn(ownerId);
+        when(reservation.getUser()).thenReturn(owner);
+
+        AuthException exception = assertThrows(
+                AuthException.class,
+                () -> reservationService.cancelReservation(username, reservationId)
+        );
+
+        assertEquals(
+                AuthErrorCode.ACCESS_DENIED,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        // 예약 소유자 검증 확인
+        verify(reservation).getUser();
+        verify(user).getId();
+        verify(owner).getId();
+
+        // 소유자 검증 실패 이후 예약 상태 검증 미실행
+        verify(reservation, never()).getReservationStatus();
+
+        // 다른 회원의 예약이 취소되면 안 됨
+        verify(reservation, never()).cancel();
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ReservationStatus.class,
+            names = {"CONFIRMED"},
+            mode = EnumSource.Mode.EXCLUDE
+    )
+    @DisplayName("CONFIRMED 상태가 아닌 예약은 취소할 수 없다")
+    void cancelReservation_invalidStatus(ReservationStatus status) {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+
+        // CONFIRMED를 제외한 모든 예약 상태를 순차적으로 설정
+        // HOLD, CANCELLED, EXPIRED, USED
+        when(reservation.getReservationStatus()).thenReturn(status);
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.cancelReservation(username, reservationId)
+        );
+
+        assertEquals(
+                ReservationErrorCode.INVALID_RESERVATION_STATUS,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        // 로그인 회원과 예약 소유자가 동일한 Mock 객체이므로
+        // 소유자 검증 과정에서 getId()가 2회 호출됨
+        verify(reservation).getUser();
+        verify(user, times(2)).getId();
+
+        verify(reservation).getReservationStatus();
+
+        // 예약 상태 검증 실패 이후 회차 조회 미실행
+        verify(reservation, never()).getTimeSlot();
+
+        // 예약 상태 변경 미실행
+        verify(reservation, never()).cancel();
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("예약과 연결된 회차가 존재하지 않으면 취소할 수 없다")
+    void cancelReservation_timeSlotNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+
+        // 기존 예약과 연결된 회차 ID 설정
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+
+        // 실제 회차 Repository 조회는 실패하도록 설정
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.empty());
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.cancelReservation(username, reservationId)
+        );
+
+        assertEquals(
+                ReservationErrorCode.TIMESLOT_NOT_FOUND,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        // 예약과 연결된 회차 ID 조회 확인
+        verify(reservation).getTimeSlot();
+        verify(timeSlot).getTimeSlotId();
+
+        // 회차 비관적 락 조회 1회 확인
+        verify(timeSlotRepository).findByIdForUpdate(timeSlotId);
+
+        // 회차 조회 실패 이후 취소 가능 시간 검증 미실행
+        verify(timeSlot, never()).getSlotDate();
+        verify(timeSlot, never()).getStartTime();
+
+        // 기존 예약 인원 조회 및 정원 복구 미실행
+        verify(reservation, never()).getPeopleCount();
+        verify(timeSlot, never()).decreaseReservedCount(anyInt());
+
+        // 예약 취소 미실행
+        verify(reservation, never()).cancel();
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("예약 취소 가능 시간이 지나면 취소할 수 없다")
+    void cancelReservation_deadlinePassed() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.of(timeSlot));
+
+        // 현재 시간으로부터 30분 뒤에 방문하는 회차 설정
+        LocalDateTime visitStart = LocalDateTime.now().plusMinutes(30);
+
+        // 회차 날짜와 시작 시간을 각각 설정
+        when(timeSlot.getSlotDate()).thenReturn(visitStart.toLocalDate());
+
+        when(timeSlot.getStartTime()).thenReturn(
+                visitStart.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")));
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.cancelReservation(username, reservationId)
+        );
+
+        assertEquals(
+                ReservationErrorCode.CANCELLATION_DEADLINE_PASSED,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+        verify(timeSlotRepository).findByIdForUpdate(timeSlotId);
+
+        // 취소 마감 시간 계산에 필요한 날짜 및 시간 조회 확인
+        verify(timeSlot).getSlotDate();
+        verify(timeSlot).getStartTime();
+
+        // 취소 가능 시간 검증 실패 이후
+        // 기존 예약 인원 조회 및 정원 복구가 발생하면 안 됨
+        verify(reservation, never()).getPeopleCount();
+        verify(timeSlot, never()).decreaseReservedCount(anyInt());
+
+        // 예약 상태 변경 미실행
+        verify(reservation, never()).cancel();
+
+        // 별도의 예약 저장 미실행
+        verify(reservationRepository, never()).save(any());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("예약을 정상적으로 취소하고 기존 회차 정원을 복구한다")
+    void cancelReservation_success() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        int peopleCount = 2;
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(5);
+
+        String qrToken = UUID.randomUUID().toString();
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.of(timeSlot));
+
+        // 현재 시간으로부터 2시간 뒤에 방문하는 회차 설정
+        LocalDateTime visitStart = LocalDateTime.now().plusHours(2);
+
+        when(timeSlot.getSlotDate()).thenReturn(visitStart.toLocalDate());
+
+        when(timeSlot.getStartTime()).thenReturn(
+                visitStart.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))
+        );
+
+        // 기존 본인 예약 인원 설정
+        when(reservation.getPeopleCount()).thenReturn(peopleCount);
+
+        // 응답 DTO 변환에 필요한 데이터 설정
+        when(reservation.getReservationId()).thenReturn(reservationId);
+        when(reservation.getExpiresAt()).thenReturn(expiresAt);
+        when(reservation.getQrToken()).thenReturn(qrToken);
+
+        // Mock 객체는 실제 cancel() 메서드를 실행하지 않으므로
+        // cancel() 호출 시 예약 상태가 CANCELLED로 변경되도록 모의 처리
+        doAnswer(invocation -> {
+
+            when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CANCELLED);
+
+            return null;
+
+        }).when(reservation).cancel();
+
+        ReservationResponse response =
+                reservationService.cancelReservation(username, reservationId);
+
+        assertNotNull(response);
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+        verify(timeSlotRepository, times(1)).findByIdForUpdate(timeSlotId);
+
+        // 취소 가능 시간 검증에 필요한 데이터 조회 확인
+        verify(timeSlot).getSlotDate();
+        verify(timeSlot).getStartTime();
+
+        // 기존 예약 인원 전체인 2명만큼 정원 복구 확인
+        verify(timeSlot, times(1)).decreaseReservedCount(peopleCount);
+
+        // 예약 취소이므로 예약 인원 증가가 발생하면 안 됨
+        verify(timeSlot, never()).increaseReservedCount(anyInt());
+
+        // 예약 취소 메서드 1회 호출 확인
+        verify(reservation, times(1)).cancel();
+
+        // 정원이 변경되었으므로 회차 변경 이벤트 발행
+        verify(eventPublisher, times(1)).publishEvent(any(TimeSlotChangedEvent.class));
+
+        // 취소 처리 순서 검증
+        InOrder inOrder = inOrder(timeSlot, eventPublisher, reservation);
+
+        inOrder.verify(timeSlot).decreaseReservedCount(peopleCount);
+
+        inOrder.verify(eventPublisher).publishEvent(any(TimeSlotChangedEvent.class));
+
+        inOrder.verify(reservation).cancel();
+
+        // 응답 DTO 검증
+        assertEquals(reservationId, response.reservationId());
+        assertEquals(timeSlotId, response.timeSlotId());
+
+        // 예약 인원은 이력 보존을 위해 기존 값 유지
+        assertEquals(peopleCount, response.peopleCount());
+
+        // 예약 상태가 CONFIRMED에서 CANCELLED로 변경되었는지 검증
+        assertEquals(
+                ReservationStatus.CANCELLED,
+                response.reservationStatus()
+        );
+
+        assertEquals(expiresAt, response.expiresAt());
+
+        // 취소 시 QR 토큰 재발급은 발생하지 않음
+        verify(reservation, never()).renewQrToken(anyString());
+
+        // 이번 Mock 설정에서는 기존 QR 토큰이 유지됨
+        assertEquals(qrToken, response.qrToken());
+
+        // JPA Dirty Checking을 활용하므로 별도의 save() 호출 미실행
+        verify(reservationRepository, never()).save(any());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService
         );
     }
 }
