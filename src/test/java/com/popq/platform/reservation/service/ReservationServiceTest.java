@@ -7,6 +7,7 @@ import com.popq.platform.exception.AuthErrorCode;
 import com.popq.platform.exception.AuthException;
 import com.popq.platform.popup.entity.PopupStore;
 import com.popq.platform.reservation.dto.ReservationCreateRequest;
+import com.popq.platform.reservation.dto.ReservationDetailResponse;
 import com.popq.platform.reservation.dto.ReservationResponse;
 import com.popq.platform.reservation.entity.Reservation;
 import com.popq.platform.reservation.entity.ReservationStatus;
@@ -29,7 +30,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.sql.Time;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -540,6 +543,197 @@ public class ReservationServiceTest {
         verifyNoInteractions(
                 redisExpirationKeyService,
                 reservationExpirationService
+        );
+    }
+
+    // ==================== 예약 상세 조회 ====================
+
+    @Test
+    @DisplayName("존재하지 않는 예약은 조회할 수 없다")
+    void getReservation_reservationNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.empty());
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.getReservation(username, reservationId)
+        );
+
+        assertEquals(ReservationErrorCode.RESERVATION_NOT_FOUND, exception.getErrorCode());
+
+        verify(reservationRepository).findById(reservationId);
+
+        verifyNoInteractions(
+                userRepository,
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원은 예약을 조회할 수 없다")
+    void getReservation_userNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+
+        Reservation reservation = mock(Reservation.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+
+        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+
+        AuthException exception = assertThrows(
+                AuthException.class,
+                () -> reservationService.getReservation(username, reservationId)
+        );
+
+        assertEquals(AuthErrorCode.USER_NOT_FOUND, exception.getErrorCode());
+
+        verify(userRepository).findByUsername(username);
+        verify(reservationRepository).findById(reservationId);
+
+        // 예약 소유자 검증이 실행되지 않았는지 확인
+        verify(reservation, never()).getUser();
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("다른 회원의 예약은 조회할 수 없다")
+    void getReservation_accessDenied() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long ownerId = 2L;
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        User owner = mock(User.class);
+
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+
+        when(reservation.getUser()).thenReturn(owner);
+        when(owner.getId()).thenReturn(ownerId);
+
+        AuthException exception = assertThrows(
+                AuthException.class,
+                () -> reservationService.getReservation(username, reservationId)
+        );
+
+        assertEquals(AuthErrorCode.ACCESS_DENIED, exception.getErrorCode());
+
+        verify(userRepository).findByUsername(username);
+        verify(reservationRepository).findById(reservationId);
+
+        // 예약 소유자 검증이 실행되지 않았는지 확인
+        verify(reservation).getUser();
+        verify(user).getId();
+        verify(owner).getId();
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("본인의 예약 상세 정보를 정상적으로 조회한다")
+    void getReservation_success() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+        Long popId = 1L;
+
+        LocalDate slotDate = LocalDate.now().plusDays(1);
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        PopupStore popupStore = mock(PopupStore.class);
+
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+
+        // 예약 정보 설정
+        when(reservation.getReservationId()).thenReturn(reservationId);
+        when(reservation.getPeopleCount()).thenReturn(2);
+        when(reservation.getReservationStatus())
+                .thenReturn(ReservationStatus.HOLD);
+        when(reservation.getExpiresAt()).thenReturn(expiresAt);
+        when(reservation.getQrToken()).thenReturn(null);
+
+        // 회차 정보 설정
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+        when(timeSlot.getSlotDate()).thenReturn(slotDate);
+        when(timeSlot.getStartTime()).thenReturn("14:00");
+        when(timeSlot.getEndTime()).thenReturn("15:00");
+
+        // 팝업 정보 설정
+        when(timeSlot.getPopupStore()).thenReturn(popupStore);
+        when(popupStore.getPopId()).thenReturn(popId);
+        when(popupStore.getTitle()).thenReturn("테스트 팝업");
+        when(popupStore.getStoreImg()).thenReturn("popup.jpg");
+
+        ReservationDetailResponse response =
+                reservationService.getReservation(username, reservationId);
+
+        assertNotNull(response);
+
+        // 예약 정보 검증
+        assertEquals(reservationId, response.reservationId());
+        assertEquals(2, response.peopleCount());
+        assertEquals(ReservationStatus.HOLD, response.reservationStatus());
+        assertEquals(expiresAt, response.expiresAt());
+        assertNull(response.qrToken());
+
+        // 회차 정보 검증
+        assertEquals(timeSlotId, response.timeSlotId());
+        assertEquals(slotDate, response.slotDate());
+        assertEquals("14:00", response.startTime());
+        assertEquals("15:00", response.endTime());
+
+        // 팝업 정보 검증
+        assertEquals(popId, response.popId());
+        assertEquals("테스트 팝업", response.popupName());
+        assertEquals("popup.jpg", response.popupImage());
+        verify(userRepository).findByUsername(username);
+        verify(reservationRepository).findById(reservationId);
+
+        // Repository 호출 검증
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        // 예약 소유자 검증
+        verify(reservation).getUser();
+        verify(user, times(2)).getId();
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
         );
     }
 }
