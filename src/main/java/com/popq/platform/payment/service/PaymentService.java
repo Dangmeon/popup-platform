@@ -48,6 +48,10 @@ public class PaymentService {
 
         validateOrderOwner(order, username);
 
+        if (order.getOrderStatus() == OrderStatus.PAID) {
+            return getExistingPayment(order, request);
+        }
+
         validatePayment(order, request);
 
         approveTossPayment(request);
@@ -181,5 +185,29 @@ public class PaymentService {
         if (!order.getUser().getUsername().equals(username)) {
             throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
         }
+    }
+
+    // 이미 결제 완료된 주문의 동일 결제 요청 처리
+    private PaymentResponse getExistingPayment(Order order, PaymentRequest request) {
+
+        Payment payment = paymentRepository.findByOrder_OrderId(order.getOrderId())
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+        // 기존 결제 상태 검증
+        if (payment.getPaymentStatus() != PaymentStatus.PAID) {
+            throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
+        }
+
+        // 기존 결제 키 검증
+        if (!payment.getPaymentKey().equals(request.getPaymentKey())) {
+            throw new PaymentException(PaymentErrorCode.PAYMENT_KEY_MISMATCH);
+        }
+
+        // 기존 결제 금액 검증
+        if (payment.getAmount() != request.getAmount() || order.getTotalPrice() != request.getAmount()) {
+            throw new PaymentException(PaymentErrorCode.AMOUNT_MISMATCH);
+        }
+
+        return PaymentResponse.from(payment);
     }
 }

@@ -14,6 +14,7 @@ public enum PaymentErrorCode {
     TOSS_PAYMENT_FAILED(HttpStatus.BAD_REQUEST, "결제 승인에 실패했습니다."),
     TOSS_CANCEL_FAILED(HttpStatus.BAD_REQUEST, "결제 취소에 실패했습니다."),
     TOSS_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "토스페이먼츠 서버 오류가 발생했습니다."),
+    PAYMENT_KEY_MISMATCH(HttpStatus.CONFLICT, "기존 결제 정보와 결제 키가 일치하지 않습니다."),
     PAYMENT_CONNECTION_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "결제 서버와 통신 중 오류가 발생했습니다.");
 
     private final HttpStatus status;
