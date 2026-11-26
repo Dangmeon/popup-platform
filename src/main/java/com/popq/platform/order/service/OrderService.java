@@ -10,6 +10,7 @@ import com.popq.platform.order.entity.OrderItem;
 import com.popq.platform.order.entity.OrderStatus;
 import com.popq.platform.order.exception.OrderErrorCode;
 import com.popq.platform.order.exception.OrderException;
+import com.popq.platform.payment.service.PaymentOperationService;
 import com.popq.platform.product.entity.Product;
 import com.popq.platform.product.exception.ProductErrorCode;
 import com.popq.platform.product.exception.ProductException;
@@ -46,10 +47,15 @@ public class OrderService {
     private final PaymentService paymentService;
     private final CartService cartService;
     private final CouponService couponService;
+    private final PaymentOperationService paymentOperationService;
+
 
     // 주문 생성
     @Transactional
     public OrderResponse createOrder(String username, OrderCreateRequest request) {
+
+        // 동일 상품 중복 요청 검증
+        validateDuplicateProducts(request.getItems());
 
         // 로그인 회원 조회
         User user = userRepository.findByUsernameForUpdate(username)
@@ -211,17 +217,19 @@ public class OrderService {
         }
 
         // PENDING 주문 취소 및 재고 복구
-        if(order.getOrderStatus() == OrderStatus.PENDING){
+        if (order.getOrderStatus() == OrderStatus.PENDING) {
+
+            // 결제 결과가 확정되지 않은 주문은 취소 방지
+            if (paymentOperationService.hasUnresolvedConfirm(orderId)) {
+                throw new OrderException(OrderErrorCode.PAYMENT_PROCESSING);
+            }
 
             restoreStock(order);
 
-            // 주문 상태 CANCELED 변경
             order.cancel();
 
-            // TODO Redis TTL Key 삭제
             redisExpirationKeyService.delete("order:pending:" + orderId);
 
-            // 주문 응답 반환
             return OrderResponse.from(order);
         }
 
@@ -297,6 +305,16 @@ public class OrderService {
 
         if (!order.getUser().getUsername().equals(username)) {
             throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+    }
+
+    private void validateDuplicateProducts(List<OrderItemRequest> items) {
+        Set<Long> productIds = new HashSet<>();
+
+        for (OrderItemRequest item : items) {
+            if (!productIds.add(item.getPrdId())) {
+                throw new OrderException(OrderErrorCode.DUPLICATE_PRODUCT);
+            }
         }
     }
 

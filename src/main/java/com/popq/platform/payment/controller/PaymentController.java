@@ -5,6 +5,7 @@ import com.popq.platform.payment.dto.PaymentResponse;
 import com.popq.platform.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,7 +19,13 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @PostMapping("/confirm")
-    public ResponseEntity<PaymentResponse> confirm(@RequestBody PaymentRequest request) {
-        return ResponseEntity.ok(paymentService.confirmPayment(request));
+    public ResponseEntity<PaymentResponse> confirm(
+            Authentication authentication,
+            @RequestBody PaymentRequest request
+    ) {
+
+        String username = authentication.getName();
+
+        return ResponseEntity.ok(paymentService.confirmPayment(username, request));
     }
 }

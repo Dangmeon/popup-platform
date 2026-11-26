@@ -1,12 +1,14 @@
 package com.popq.platform.order.repository;
 
 import com.popq.platform.order.entity.Order;
+import com.popq.platform.order.entity.OrderStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,4 +44,15 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findAllOrders();
 
     Optional<Order> findTopByUserUsernameOrderByOrderedAtDesc(String username);
+
+    @Query("""
+        SELECT o.orderId
+        FROM Order o
+        WHERE o.orderStatus = :status
+            AND o.expiresAt <= :now
+    """)
+    List<Long> findExpiredOrderIds(
+            @Param("status") OrderStatus status,
+            @Param("now") LocalDateTime now
+    );
 }
