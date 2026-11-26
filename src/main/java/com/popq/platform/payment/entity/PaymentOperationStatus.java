@@ -4,5 +4,6 @@ public enum PaymentOperationStatus {
     PENDING,
     COMPLETED,
     RECOVERY_REQUIRED,
+    COMPENSATION_REQUIRED,
     FAILED
 }

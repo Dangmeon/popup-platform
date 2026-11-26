@@ -90,7 +90,7 @@ public class PaymentOperationService {
     public boolean hasUnresolvedConfirm(Long orderId) {
         return paymentOperationRepository.existsByOrderIdAndOperationTypeAndOperationStatusIn(
                 orderId, PaymentOperationType.CONFIRM,
-                List.of(PaymentOperationStatus.PENDING, PaymentOperationStatus.RECOVERY_REQUIRED)
+                List.of(PaymentOperationStatus.PENDING, PaymentOperationStatus.RECOVERY_REQUIRED, PaymentOperationStatus.COMPENSATION_REQUIRED)
         );
     }
 

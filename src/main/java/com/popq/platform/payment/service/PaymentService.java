@@ -226,7 +226,8 @@ public class PaymentService {
 
         // 이미 처리된 작업은 복구하지 않음
         if (operation.getOperationStatus() == PaymentOperationStatus.COMPLETED
-                || operation.getOperationStatus() == PaymentOperationStatus.FAILED) {
+                || operation.getOperationStatus() == PaymentOperationStatus.FAILED
+                || operation.getOperationStatus() == PaymentOperationStatus.COMPENSATION_REQUIRED) {
             return;
         }
 
@@ -295,6 +296,12 @@ public class PaymentService {
 
         // 아직 결제 결과가 확정되지 않은 경우
         operation.requireRecovery("Toss 결제 상태: " + tossPayment.status());
+    }
+
+    // 내부 정합성 복구 서비스에서 사용하는 보상 취소
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void compensateTossPayment(String paymentKey) {
+        cancelTossPayment(paymentKey);
     }
 
     private Order getOrderForUpdate(String tossOrderId) {

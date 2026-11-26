@@ -103,4 +103,10 @@ public class PaymentOperation {
         this.retryCount++;
         this.updatedAt = LocalDateTime.now();
     }
+
+    public void requireCompensation(String failureReason) {
+        this.operationStatus = PaymentOperationStatus.COMPENSATION_REQUIRED;
+        this.failureReason = failureReason;
+        this.updatedAt = LocalDateTime.now();
+    }
 }
