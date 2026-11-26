@@ -2,6 +2,8 @@ package com.popq.platform.order.service;
 
 import com.popq.platform.auth.entity.User;
 import com.popq.platform.coupon.entity.UserCoupon;
+import com.popq.platform.exception.AuthErrorCode;
+import com.popq.platform.exception.AuthException;
 import com.popq.platform.order.dto.*;
 import com.popq.platform.order.entity.Order;
 import com.popq.platform.order.entity.OrderItem;
@@ -31,6 +33,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class OrderService {
 
     private static final int ORDER_EXPIRE_MINUTES = 10;
@@ -56,7 +59,7 @@ public class OrderService {
 
         // 로그인 회원 조회
         User user = userRepository.findByUsernameForUpdate(username)
-                .orElseThrow(() -> new IllegalArgumentException("회원이 없습니다."));
+                .orElseThrow(() -> new AuthException(AuthErrorCode.USER_NOT_FOUND));
 
         int totalPrice = 0;
         LocalDateTime now = LocalDateTime.now();
@@ -284,7 +287,7 @@ public class OrderService {
 
     private User getUser(String username) {
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("회원이 아닙니다."));
+                .orElseThrow(() -> new AuthException(AuthErrorCode.USER_NOT_FOUND));
     }
 
     private Product getProduct(Long prdId) {
