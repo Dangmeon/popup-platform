@@ -12,6 +12,7 @@ import com.popq.platform.payment.exception.PaymentErrorCode;
 import com.popq.platform.payment.exception.PaymentException;
 import com.popq.platform.common.redis.RedisExpirationKeyService;
 import com.popq.platform.order.repository.OrderRepository;
+import com.popq.platform.payment.repository.PaymentOperationRepository;
 import com.popq.platform.payment.repository.PaymentRepository;
 import com.popq.platform.coupon.service.CouponService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -42,6 +44,7 @@ public class PaymentService {
     private final RestClient restClient;
     private final CouponService couponService;
     private final PaymentOperationService paymentOperationService;
+    private final PaymentOperationRepository paymentOperationRepository;
 
     @Value("${toss.secret-key}")
     private String tossSecretKey;
@@ -88,7 +91,7 @@ public class PaymentService {
         return PaymentResponse.from(payment);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.MANDATORY)
     public void cancelPayment(Order order) {
 
         Payment payment = paymentRepository.findByOrder_OrderId(order.getOrderId())
@@ -96,9 +99,22 @@ public class PaymentService {
 
         validateCancelablePayment(payment);
 
+        String idempotencyKey = "cancel-" + payment.getPaymentKey();
+
+        if (paymentOperationService.existsOperation(idempotencyKey)) {
+            throw new OrderException(OrderErrorCode.PAYMENT_PROCESSING);
+        }
+
+        Long operationId = paymentOperationService.createOperation(
+                order.getOrderId(), order.getTossOrderId(), payment.getPaymentKey(),
+                payment.getAmount(), idempotencyKey, PaymentOperationType.CANCEL
+        );
+
         cancelTossPayment(payment.getPaymentKey());
 
         payment.cancel();
+
+        paymentOperationService.completeOperation(operationId);
     }
 
     private void approveTossPayment(PaymentRequest request) {
