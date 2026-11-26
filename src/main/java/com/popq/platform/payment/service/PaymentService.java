@@ -6,6 +6,7 @@ import com.popq.platform.payment.dto.PaymentRequest;
 import com.popq.platform.payment.dto.PaymentResponse;
 import com.popq.platform.order.entity.Order;
 import com.popq.platform.order.entity.OrderStatus;
+import com.popq.platform.payment.dto.TossPaymentResponse;
 import com.popq.platform.payment.entity.Payment;
 import com.popq.platform.payment.entity.PaymentStatus;
 import com.popq.platform.payment.exception.PaymentErrorCode;
@@ -152,6 +153,34 @@ public class PaymentService {
 
         } catch (RestClientException e) {
 
+            throw new PaymentException(PaymentErrorCode.PAYMENT_CONNECTION_ERROR);
+        }
+    }
+
+    // Toss 서버의 실제 결제 상태 조회
+    public TossPaymentResponse getTossPayment(String paymentKey) {
+        try {
+            TossPaymentResponse response = restClient.get()
+                    .uri("https://api.tosspayments.com/v1/payments/{paymentKey}", paymentKey)
+                    .headers(headers -> headers.setBasicAuth(tossSecretKey, ""))
+                    .retrieve()
+                    .body(TossPaymentResponse.class);
+
+            if (response == null || !paymentKey.equals(response.paymentKey())
+                    || response.orderId() == null || response.status() == null
+                    || response.totalAmount() == null || response.balanceAmount() == null) {
+                throw new PaymentException(PaymentErrorCode.INVALID_TOSS_PAYMENT_RESPONSE);
+            }
+
+            return response;
+
+        } catch (HttpClientErrorException e) {
+            throw new PaymentException(PaymentErrorCode.TOSS_PAYMENT_LOOKUP_FAILED);
+
+        } catch (HttpServerErrorException e) {
+            throw new PaymentException(PaymentErrorCode.TOSS_SERVER_ERROR);
+
+        } catch (RestClientException e) {
             throw new PaymentException(PaymentErrorCode.PAYMENT_CONNECTION_ERROR);
         }
     }
