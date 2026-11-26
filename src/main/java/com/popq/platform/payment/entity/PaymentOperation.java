@@ -46,23 +46,17 @@ public class PaymentOperation {
     @Column(name = "operation_status", nullable = false)
     private PaymentOperationStatus operationStatus;
 
-    @Column(name = "retry_count", nullable = false)
-    private int retryCount;
-
-    @Column(name = "failure_reason", length = 1000)
-    private String failureReason;
-
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column(name = "completed_at")
-    private LocalDateTime completedAt;
-
-    public static PaymentOperation create(Long orderId, String tossOrderId, String paymentKey,
-                                          int amount, String idempotencyKey, PaymentOperationType operationType) {
+    // 결제 처리 이력 생성
+    public static PaymentOperation create(
+            Long orderId, String tossOrderId, String paymentKey,
+            int amount, String idempotencyKey, PaymentOperationType operationType
+    ) {
 
         PaymentOperation operation = new PaymentOperation();
 
@@ -73,40 +67,26 @@ public class PaymentOperation {
         operation.idempotencyKey = idempotencyKey;
         operation.operationType = operationType;
         operation.operationStatus = PaymentOperationStatus.PENDING;
-        operation.retryCount = 0;
         operation.createdAt = LocalDateTime.now();
-        operation.updatedAt = LocalDateTime.now();
+        operation.updatedAt = operation.createdAt;
 
         return operation;
     }
 
+    // 내부 결제 처리 완료
     public void complete() {
         this.operationStatus = PaymentOperationStatus.COMPLETED;
-        this.completedAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-        this.failureReason = null;
-    }
-
-    public void requireRecovery(String failureReason) {
-        this.operationStatus = PaymentOperationStatus.RECOVERY_REQUIRED;
-        this.failureReason = failureReason;
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void fail(String failureReason) {
+    // 외부 결제 실패 확정
+    public void fail() {
         this.operationStatus = PaymentOperationStatus.FAILED;
-        this.failureReason = failureReason;
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void increaseRetryCount() {
-        this.retryCount++;
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    public void requireCompensation(String failureReason) {
-        this.operationStatus = PaymentOperationStatus.COMPENSATION_REQUIRED;
-        this.failureReason = failureReason;
+    // 복구 시도 시간 갱신
+    public void touch() {
         this.updatedAt = LocalDateTime.now();
     }
 }

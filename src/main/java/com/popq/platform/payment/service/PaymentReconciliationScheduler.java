@@ -20,74 +20,68 @@ public class PaymentReconciliationScheduler {
 
     private static final long RECOVERY_INTERVAL = 60 * 1000L;
     private static final int RECOVERY_DELAY_MINUTES = 2;
-    private static final int MAX_RETRY_COUNT = 3;
     private static final int BATCH_SIZE = 50;
 
     private final PaymentOperationRepository paymentOperationRepository;
     private final PaymentOperationService paymentOperationService;
     private final PaymentService paymentService;
-    private final PaymentCancellationRecoveryService cancellationRecoveryService;
-    private final PaymentCompensationService paymentCompensationService;
 
+    // 미완료 결제 처리 이력 복구
     @Scheduled(fixedDelay = RECOVERY_INTERVAL)
     public void reconcilePayments() {
 
-        List<PaymentOperationStatus> statuses = List.of(
+        LocalDateTime before = LocalDateTime.now()
+                .minusMinutes(RECOVERY_DELAY_MINUTES);
+
+        List<Long> operationIds = paymentOperationRepository.findRecoveryTargetIds(
                 PaymentOperationStatus.PENDING,
-                PaymentOperationStatus.RECOVERY_REQUIRED,
-                PaymentOperationStatus.COMPENSATION_REQUIRED
+                before,
+                PageRequest.of(0, BATCH_SIZE)
         );
 
-        LocalDateTime before = LocalDateTime.now().minusMinutes(RECOVERY_DELAY_MINUTES);
-
-        List<Long> operationIds = paymentOperationRepository.findRecoveryTargetIds(statuses, before, PageRequest.of(0, BATCH_SIZE));
-
         for (Long operationId : operationIds) {
+
             try {
                 recoverOperation(operationId);
+
             } catch (Exception e) {
-                log.error("결제 정합성 복구 실패: operationId={}", operationId, e);
+
+                log.error("결제 복구 실패: operationId={}", operationId, e);
 
                 try {
-                    paymentOperationService.recordRecoveryFailure(operationId, e.getClass().getSimpleName());
-                } catch (Exception recordException) {
-                    log.error("결제 복구 실패 이력 저장 실패: operationId={}", operationId, recordException);
+                    paymentOperationService.touchOperation(operationId);
+
+                } catch (Exception touchException) {
+                    log.error("복구 시도 시간 갱신 실패: operationId={}",
+                            operationId, touchException);
                 }
             }
         }
     }
 
+    // 결제 작업 유형에 따른 복구 실행
     private void recoverOperation(Long operationId) {
 
-        PaymentOperation operation = paymentOperationRepository.findById(operationId).orElse(null);
+        PaymentOperation operation = paymentOperationRepository
+                .findById(operationId)
+                .orElse(null);
 
-        if (operation == null) {
-            return;
-        }
-
-        PaymentOperationStatus status = operation.getOperationStatus();
-
-        if (status == PaymentOperationStatus.COMPLETED || status == PaymentOperationStatus.FAILED) {
-            return;
-        }
-
-        if (operation.getRetryCount() >= MAX_RETRY_COUNT) {
-            log.warn("결제 복구 반복 실패로 관리자 확인 필요: operationId={}, retryCount={}",
-                    operationId, operation.getRetryCount());
-        }
-
-        if (status == PaymentOperationStatus.COMPENSATION_REQUIRED) {
-            paymentCompensationService.compensatePayment(operation.getOrderId(), operationId);
+        if (operation == null
+                || operation.getOperationStatus() != PaymentOperationStatus.PENDING) {
             return;
         }
 
         if (operation.getOperationType() == PaymentOperationType.CONFIRM) {
-            paymentService.recoverConfirmPayment(operation.getOrderId(), operationId);
-            return;
-        }
 
-        if (operation.getOperationType() == PaymentOperationType.CANCEL) {
-            cancellationRecoveryService.recoverCancelPayment(operation.getOrderId(), operationId);
+            paymentService.recoverConfirmPayment(
+                    operation.getOrderId(), operationId
+            );
+
+        } else if (operation.getOperationType() == PaymentOperationType.CANCEL) {
+
+            paymentService.recoverCancelPayment(
+                    operation.getOrderId(), operationId
+            );
         }
     }
 }

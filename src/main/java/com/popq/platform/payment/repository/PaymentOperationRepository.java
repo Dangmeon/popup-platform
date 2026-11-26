@@ -16,8 +16,10 @@ import java.util.Optional;
 
 public interface PaymentOperationRepository extends JpaRepository<PaymentOperation, Long> {
 
+    // 기존 결제 처리 이력 조회
     Optional<PaymentOperation> findByIdempotencyKey(String idempotencyKey);
 
+    // 결제 처리 이력 비관적 락 조회
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT p
@@ -26,32 +28,27 @@ public interface PaymentOperationRepository extends JpaRepository<PaymentOperati
     """)
     Optional<PaymentOperation> findByIdForUpdate(@Param("operationId") Long operationId);
 
+    // 스케줄러 복구 대상 조회
     @Query("""
         SELECT p.operationId
         FROM PaymentOperation p
-        WHERE p.operationStatus IN :statuses
-            AND p.updatedAt <= :before
-        ORDER BY p.updatedAt ASC
-    """)
-    List<Long> findRecoveryTargetIds(
-            @Param("statuses") List<PaymentOperationStatus> statuses,
-            @Param("before") LocalDateTime before
-    );
-
-    boolean existsByOrderIdAndOperationTypeAndOperationStatusIn(
-            Long orderId, PaymentOperationType operationType, List<PaymentOperationStatus> statuses
-    );
-
-    @Query("""
-        SELECT p.operationId
-        FROM PaymentOperation p
-        WHERE p.operationStatus IN :statuses
+        WHERE p.operationStatus = :status
             AND p.updatedAt <= :before
         ORDER BY p.updatedAt ASC, p.operationId ASC
     """)
     List<Long> findRecoveryTargetIds(
-            @Param("statuses") List<PaymentOperationStatus> statuses,
+            @Param("status") PaymentOperationStatus status,
             @Param("before") LocalDateTime before,
             Pageable pageable
     );
+
+    // 미완료 결제 처리 이력 존재 여부
+    boolean existsByOrderIdAndOperationTypeAndOperationStatus(
+            Long orderId,
+            PaymentOperationType operationType,
+            PaymentOperationStatus status
+    );
+
+    // 주문별 결제 처리 이력 조회
+    List<PaymentOperation> findAllByOrderId(Long orderId);
 }

@@ -5,6 +5,7 @@ import com.popq.platform.order.exception.OrderException;
 import com.popq.platform.payment.dto.PaymentRequest;
 import com.popq.platform.payment.dto.PaymentResponse;
 import com.popq.platform.order.entity.Order;
+import com.popq.platform.order.entity.OrderItem;
 import com.popq.platform.order.entity.OrderStatus;
 import com.popq.platform.payment.dto.TossPaymentResponse;
 import com.popq.platform.payment.entity.*;
@@ -14,6 +15,7 @@ import com.popq.platform.common.redis.RedisExpirationKeyService;
 import com.popq.platform.order.repository.OrderRepository;
 import com.popq.platform.payment.repository.PaymentOperationRepository;
 import com.popq.platform.payment.repository.PaymentRepository;
+import com.popq.platform.product.repository.ProductRepository;
 import com.popq.platform.coupon.service.CouponService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,10 +47,12 @@ public class PaymentService {
     private final CouponService couponService;
     private final PaymentOperationService paymentOperationService;
     private final PaymentOperationRepository paymentOperationRepository;
+    private final ProductRepository productRepository;
 
     @Value("${toss.secret-key}")
     private String tossSecretKey;
 
+    // 결제 승인
     @Transactional
     public PaymentResponse confirmPayment(String username, PaymentRequest request) {
 
@@ -80,43 +84,51 @@ public class PaymentService {
         // 외부 결제 승인
         approveTossPayment(request);
 
-        // 내부 결제 완료 처리
+        // 내부 결제 완료
         Payment payment = completePayment(order, request.getPaymentKey(), request.getAmount());
 
-        // 내부 결제 정보와 동일한 트랜잭션에서 완료 처리
+        // 결제 처리 이력 완료
         paymentOperationService.completeOperation(operationId);
 
+        // DB 커밋 이후 Redis 만료 키 삭제
         deleteExpirationKeyAfterCommit(order.getOrderId());
 
         return PaymentResponse.from(payment);
     }
 
+    // 결제 취소
     @Transactional(propagation = Propagation.MANDATORY)
     public void cancelPayment(Order order) {
 
-        Payment payment = paymentRepository.findByOrder_OrderId(order.getOrderId())
-                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+        Payment payment = findPayment(order.getOrderId());
 
         validateCancelablePayment(payment);
 
         String idempotencyKey = "cancel-" + payment.getPaymentKey();
 
+        // 중복 취소 요청 방지
         if (paymentOperationService.existsOperation(idempotencyKey)) {
             throw new OrderException(OrderErrorCode.PAYMENT_PROCESSING);
         }
 
+        // 결제 취소 처리 이력 독립 저장
         Long operationId = paymentOperationService.createOperation(
-                order.getOrderId(), order.getTossOrderId(), payment.getPaymentKey(),
-                payment.getAmount(), idempotencyKey, PaymentOperationType.CANCEL
+                order.getOrderId(), order.getTossOrderId(),
+                payment.getPaymentKey(), payment.getAmount(),
+                idempotencyKey, PaymentOperationType.CANCEL
         );
 
+        // 외부 결제 취소
         cancelTossPayment(payment.getPaymentKey());
 
+        // 내부 결제 취소
         payment.cancel();
 
+        // 결제 처리 이력 완료
         paymentOperationService.completeOperation(operationId);
     }
 
+    // Toss 결제 승인 요청
     private void approveTossPayment(PaymentRequest request) {
 
         try {
@@ -132,19 +144,17 @@ public class PaymentService {
                     .toBodilessEntity();
 
         } catch (HttpClientErrorException e) {
-
             throw new PaymentException(PaymentErrorCode.TOSS_PAYMENT_FAILED);
 
         } catch (HttpServerErrorException e) {
-
             throw new PaymentException(PaymentErrorCode.TOSS_SERVER_ERROR);
 
         } catch (RestClientException e) {
-
             throw new PaymentException(PaymentErrorCode.PAYMENT_CONNECTION_ERROR);
         }
     }
 
+    // Toss 결제 취소 요청
     private void cancelTossPayment(String paymentKey) {
 
         Map<String, String> body = Map.of(
@@ -167,31 +177,36 @@ public class PaymentService {
                     .toBodilessEntity();
 
         } catch (HttpClientErrorException e) {
-
             throw new PaymentException(PaymentErrorCode.TOSS_CANCEL_FAILED);
 
         } catch (HttpServerErrorException e) {
-
             throw new PaymentException(PaymentErrorCode.TOSS_SERVER_ERROR);
 
         } catch (RestClientException e) {
-
             throw new PaymentException(PaymentErrorCode.PAYMENT_CONNECTION_ERROR);
         }
     }
 
     // Toss 서버의 실제 결제 상태 조회
     public TossPaymentResponse getTossPayment(String paymentKey) {
+
         try {
             TossPaymentResponse response = restClient.get()
-                    .uri("https://api.tosspayments.com/v1/payments/{paymentKey}", paymentKey)
+                    .uri(
+                            "https://api.tosspayments.com/v1/payments/{paymentKey}",
+                            paymentKey
+                    )
                     .headers(headers -> headers.setBasicAuth(tossSecretKey, ""))
                     .retrieve()
                     .body(TossPaymentResponse.class);
 
-            if (response == null || !paymentKey.equals(response.paymentKey())
-                    || response.orderId() == null || response.status() == null
-                    || response.totalAmount() == null || response.balanceAmount() == null) {
+            if (response == null
+                    || !paymentKey.equals(response.paymentKey())
+                    || response.orderId() == null
+                    || response.status() == null
+                    || response.totalAmount() == null
+                    || response.balanceAmount() == null) {
+
                 throw new PaymentException(PaymentErrorCode.INVALID_TOSS_PAYMENT_RESPONSE);
             }
 
@@ -208,69 +223,58 @@ public class PaymentService {
         }
     }
 
-    // 외부 결제 승인 이후 내부 DB 처리 실패 복구
+    // 결제 승인 이후 DB 롤백 복구
     @Transactional
     public void recoverConfirmPayment(Long orderId, Long operationId) {
 
-        // 기존 결제 승인 및 주문 만료와 동일한 순서로 락 획득
-        Order order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+        Order order = findOrderForUpdate(orderId);
 
-        PaymentOperation operation = paymentOperationRepository.findByIdForUpdate(operationId)
-                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_NOT_FOUND));
+        PaymentOperation operation = findOperationForUpdate(
+                orderId, operationId, PaymentOperationType.CONFIRM
+        );
 
-        if (!operation.getOrderId().equals(orderId)
-                || operation.getOperationType() != PaymentOperationType.CONFIRM) {
-            throw new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_MISMATCH);
-        }
-
-        // 이미 처리된 작업은 복구하지 않음
-        if (operation.getOperationStatus() == PaymentOperationStatus.COMPLETED
-                || operation.getOperationStatus() == PaymentOperationStatus.FAILED
-                || operation.getOperationStatus() == PaymentOperationStatus.COMPENSATION_REQUIRED) {
+        // 미완료 작업만 복구
+        if (operation.getOperationStatus() != PaymentOperationStatus.PENDING) {
             return;
         }
 
-        // 실제 Toss 결제 상태 조회
+        // Toss 실제 결제 상태 조회
         TossPaymentResponse tossPayment = getTossPayment(operation.getPaymentKey());
 
-        // 외부 결제 정보와 내부 처리 이력 일치 여부 검증
-        if (!operation.getTossOrderId().equals(tossPayment.orderId())
-                || !order.getTossOrderId().equals(tossPayment.orderId())
-                || operation.getAmount() != tossPayment.totalAmount()
-                || order.getTotalPrice() != tossPayment.totalAmount()) {
-            throw new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_MISMATCH);
-        }
+        validateRecoveryPayment(order, operation, tossPayment);
 
-        // Toss에서는 결제가 완료된 상태
+        // Toss 결제 승인 완료
         if (tossPayment.isDone()) {
 
             if (tossPayment.balanceAmount() != operation.getAmount()) {
                 throw new PaymentException(PaymentErrorCode.INVALID_TOSS_PAYMENT_RESPONSE);
             }
 
+            // 이미 내부 결제가 완료된 경우
             if (order.getOrderStatus() == OrderStatus.PAID) {
-                Payment payment = paymentRepository.findByOrder_OrderId(orderId)
-                        .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
-                if (payment.getPaymentStatus() != PaymentStatus.PAID
-                        || !payment.getPaymentKey().equals(operation.getPaymentKey())
-                        || payment.getAmount() != operation.getAmount()) {
-                    throw new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_MISMATCH);
+                Payment payment = findPayment(orderId);
+
+                validateRecoveryPaymentInfo(payment, operation);
+
+                if (payment.getPaymentStatus() != PaymentStatus.PAID) {
+                    throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
                 }
 
-                operation.complete();
-                deleteExpirationKeyAfterCommit(orderId);
-                return;
-            }
+            } else {
 
-            // 재고가 유지된 PENDING 주문만 정상 결제 복구
-            if (order.getOrderStatus() != OrderStatus.PENDING
-                    || paymentRepository.findByOrder_OrderId(orderId).isPresent()) {
-                throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
-            }
+                // 재고가 유지된 미결제 주문만 복구
+                if (order.getOrderStatus() != OrderStatus.PENDING
+                        || paymentRepository.findByOrder_OrderId(orderId).isPresent()) {
 
-            completePayment(order, operation.getPaymentKey(), operation.getAmount());
+                    throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
+                }
+
+                // 내부 결제 정보 복구
+                completePayment(
+                        order, operation.getPaymentKey(), operation.getAmount()
+                );
+            }
 
             operation.complete();
 
@@ -279,43 +283,139 @@ public class PaymentService {
             return;
         }
 
-        // 외부 결제가 최종 실패하거나 전액 취소된 경우
+        // 외부 결제 실패 또는 전액 취소 확정
         if ("ABORTED".equals(tossPayment.status())
                 || "EXPIRED".equals(tossPayment.status())
                 || (tossPayment.isCanceled() && tossPayment.balanceAmount() == 0)) {
 
             if (order.getOrderStatus() != OrderStatus.PENDING
                     || paymentRepository.findByOrder_OrderId(orderId).isPresent()) {
+
                 throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
             }
 
-            operation.fail("Toss 결제 상태: " + tossPayment.status());
+            operation.fail();
 
             return;
         }
 
-        // 아직 결제 결과가 확정되지 않은 경우
-        operation.requireRecovery("Toss 결제 상태: " + tossPayment.status());
+        // 결제 결과 미확정 시 PENDING 유지
+        operation.touch();
+
+        log.warn("결제 승인 복구 대기: operationId={}, status={}",
+                operationId, tossPayment.status());
     }
 
-    // 내부 정합성 복구 서비스에서 사용하는 보상 취소
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void compensateTossPayment(String paymentKey) {
-        cancelTossPayment(paymentKey);
+    // 결제 취소 이후 DB 롤백 복구
+    @Transactional
+    public void recoverCancelPayment(Long orderId, Long operationId) {
+
+        Order order = findOrderForUpdate(orderId);
+
+        PaymentOperation operation = findOperationForUpdate(
+                orderId, operationId, PaymentOperationType.CANCEL
+        );
+
+        // 미완료 작업만 복구
+        if (operation.getOperationStatus() != PaymentOperationStatus.PENDING) {
+            return;
+        }
+
+        Payment payment = findPayment(orderId);
+
+        // Toss 실제 결제 상태 조회
+        TossPaymentResponse tossPayment = getTossPayment(operation.getPaymentKey());
+
+        validateRecoveryPayment(order, operation, tossPayment);
+
+        validateRecoveryPaymentInfo(payment, operation);
+
+        // 전액 취소가 확인되지 않으면 내부 상태 유지
+        if (!tossPayment.isCanceled() || tossPayment.balanceAmount() != 0) {
+
+            operation.touch();
+
+            log.warn("결제 취소 복구 대기: operationId={}, status={}",
+                    operationId, tossPayment.status());
+
+            return;
+        }
+
+        // 이미 내부 취소가 완료된 경우
+        if (order.getOrderStatus() == OrderStatus.CANCELLED
+                && payment.getPaymentStatus() == PaymentStatus.CANCELLED) {
+
+            operation.complete();
+
+            return;
+        }
+
+        // 결제 완료 상태의 주문만 취소 복구
+        if (order.getOrderStatus() != OrderStatus.PAID
+                || payment.getPaymentStatus() != PaymentStatus.PAID) {
+
+            throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        // 결제 취소
+        payment.cancel();
+
+        // 상품 재고 복구
+        restoreStock(order);
+
+        // 주문 취소
+        order.cancel();
+
+        // 결제 처리 이력 완료
+        operation.complete();
     }
 
+    // Toss 주문 ID로 주문 비관적 락 조회
     private Order getOrderForUpdate(String tossOrderId) {
+
         return orderRepository.findByTossOrderIdForUpdate(tossOrderId)
                 .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
     }
 
+    // 내부 주문 ID로 주문 비관적 락 조회
+    private Order findOrderForUpdate(Long orderId) {
+
+        return orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+    }
+
+    // 결제 정보 조회
+    private Payment findPayment(Long orderId) {
+
+        return paymentRepository.findByOrder_OrderId(orderId)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+    }
+
+    // 결제 처리 이력 비관적 락 조회
+    private PaymentOperation findOperationForUpdate(
+            Long orderId, Long operationId, PaymentOperationType type
+    ) {
+
+        PaymentOperation operation = paymentOperationRepository.findByIdForUpdate(operationId)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_NOT_FOUND));
+
+        if (!operation.getOrderId().equals(orderId)
+                || operation.getOperationType() != type) {
+
+            throw new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_MISMATCH);
+        }
+
+        return operation;
+    }
+
+    // 결제 승인 가능 여부 검증
     private void validatePayment(Order order, PaymentRequest request) {
 
         if (order.getOrderStatus() != OrderStatus.PENDING) {
             throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS);
         }
 
-        if(!LocalDateTime.now().isBefore(order.getExpiresAt())){
+        if (!LocalDateTime.now().isBefore(order.getExpiresAt())) {
             throw new OrderException(OrderErrorCode.ORDER_EXPIRED);
         }
 
@@ -324,6 +424,7 @@ public class PaymentService {
         }
     }
 
+    // 결제 취소 가능 여부 검증
     private void validateCancelablePayment(Payment payment) {
 
         if (payment.getPaymentStatus() != PaymentStatus.PAID) {
@@ -331,30 +432,55 @@ public class PaymentService {
         }
     }
 
+    // 주문 소유권 검증
     private void validateOrderOwner(Order order, String username) {
+
         if (!order.getUser().getUsername().equals(username)) {
             throw new OrderException(OrderErrorCode.ORDER_ACCESS_DENIED);
+        }
+    }
+
+    // 외부 결제 정보와 내부 주문 및 처리 이력 검증
+    private void validateRecoveryPayment(
+            Order order, PaymentOperation operation, TossPaymentResponse tossPayment
+    ) {
+
+        if (!operation.getPaymentKey().equals(tossPayment.paymentKey())
+                || !operation.getTossOrderId().equals(tossPayment.orderId())
+                || !order.getTossOrderId().equals(tossPayment.orderId())
+                || operation.getAmount() != tossPayment.totalAmount()
+                || order.getTotalPrice() != tossPayment.totalAmount()) {
+
+            throw new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_MISMATCH);
+        }
+    }
+
+    // 기존 내부 결제 정보 검증
+    private void validateRecoveryPaymentInfo(
+            Payment payment, PaymentOperation operation
+    ) {
+
+        if (!payment.getPaymentKey().equals(operation.getPaymentKey())
+                || payment.getAmount() != operation.getAmount()) {
+
+            throw new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_MISMATCH);
         }
     }
 
     // 이미 결제 완료된 주문의 동일 결제 요청 처리
     private PaymentResponse getExistingPayment(Order order, PaymentRequest request) {
 
-        Payment payment = paymentRepository.findByOrder_OrderId(order.getOrderId())
-                .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+        Payment payment = findPayment(order.getOrderId());
 
-        // 기존 결제 상태 검증
-        if (payment.getPaymentStatus() != PaymentStatus.PAID) {
-            throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
-        }
+        validateCancelablePayment(payment);
 
-        // 기존 결제 키 검증
         if (!payment.getPaymentKey().equals(request.getPaymentKey())) {
             throw new PaymentException(PaymentErrorCode.PAYMENT_KEY_MISMATCH);
         }
 
-        // 기존 결제 금액 검증
-        if (payment.getAmount() != request.getAmount() || order.getTotalPrice() != request.getAmount()) {
+        if (payment.getAmount() != request.getAmount()
+                || order.getTotalPrice() != request.getAmount()) {
+
             throw new PaymentException(PaymentErrorCode.AMOUNT_MISMATCH);
         }
 
@@ -368,8 +494,13 @@ public class PaymentService {
 
         paymentRepository.save(payment);
 
+        // 쿠폰을 사용한 경우 쿠폰 사용 처리
         if (order.getUserCoupon() != null) {
-            couponService.useCoupon(order.getUser().getUsername(), order.getUserCoupon().getId());
+
+            couponService.useCoupon(
+                    order.getUser().getUsername(),
+                    order.getUserCoupon().getId()
+            );
         }
 
         order.completePayment();
@@ -377,18 +508,39 @@ public class PaymentService {
         return payment;
     }
 
+    // 상품 재고 복구
+    private void restoreStock(Order order) {
+
+        for (OrderItem item : order.getOrderItems()) {
+
+            int updatedRows = productRepository.increaseStock(
+                    item.getProduct().getPrdId(),
+                    item.getQuantity()
+            );
+
+            if (updatedRows == 0) {
+                throw new OrderException(OrderErrorCode.STOCK_RESTORE_FAILED);
+            }
+        }
+    }
+
     // DB 커밋 성공 이후 Redis 만료 키 삭제
     private void deleteExpirationKeyAfterCommit(Long orderId) {
 
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                try {
-                    redisExpirationKeyService.delete("order:pending:" + orderId);
-                } catch (Exception e) {
-                    log.error("결제 완료 후 Redis 만료 키 삭제 실패: orderId={}", orderId, e);
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+
+                    @Override
+                    public void afterCommit() {
+
+                        try {
+                            redisExpirationKeyService.delete("order:pending:" + orderId);
+
+                        } catch (Exception e) {
+                            log.error("결제 완료 후 Redis 만료 키 삭제 실패: orderId={}", orderId, e);
+                        }
+                    }
                 }
-            }
-        });
+        );
     }
 }
