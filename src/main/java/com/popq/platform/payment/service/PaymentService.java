@@ -98,9 +98,10 @@ public class PaymentService {
         try {
             restClient.post()
                     .uri("https://api.tosspayments.com/v1/payments/confirm")
-                    .headers(headers ->
-                            headers.setBasicAuth(tossSecretKey, "")
-                    )
+                    .headers(headers -> {
+                        headers.setBasicAuth(tossSecretKey, "");
+                        headers.set("Idempotency-Key", "confirm-" + request.getOrderId());
+                    })
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
@@ -132,9 +133,10 @@ public class PaymentService {
                             "https://api.tosspayments.com/v1/payments/{paymentKey}/cancel",
                             paymentKey
                     )
-                    .headers(headers ->
-                            headers.setBasicAuth(tossSecretKey, "")
-                    )
+                    .headers(headers -> {
+                        headers.setBasicAuth(tossSecretKey, "");
+                        headers.set("Idempotency-Key", "cancel-" + paymentKey);
+                    })
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()

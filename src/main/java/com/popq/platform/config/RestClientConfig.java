@@ -9,7 +9,7 @@ import org.springframework.web.client.RestClient;
 public class RestClientConfig {
 
     private static final int CONNECT_TIMEOUT = 3000;
-    private static final int READ_TIMEOUT = 10000;
+    private static final int READ_TIMEOUT = 60000;
 
     @Bean
     public RestClient restClient() {
