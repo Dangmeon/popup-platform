@@ -31,7 +31,7 @@ public class Order {
     @Column(name = "ORDER_ID")
     private Long orderId;
 
-    @Column(name = "TOSS_ORDER_ID", unique = true, length = 20)
+    @Column(name = "TOSS_ORDER_ID", unique = true)
     private String tossOrderId;
 
     @ManyToOne(fetch = FetchType.LAZY)
