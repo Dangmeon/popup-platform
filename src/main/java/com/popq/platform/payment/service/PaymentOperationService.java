@@ -94,6 +94,11 @@ public class PaymentOperationService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public boolean existsOperation(String idempotencyKey) {
+        return paymentOperationRepository.findByIdempotencyKey(idempotencyKey).isPresent();
+    }
+
     private PaymentOperation getOperationForUpdate(Long operationId) {
         return paymentOperationRepository.findByIdForUpdate(operationId)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_OPERATION_NOT_FOUND));
