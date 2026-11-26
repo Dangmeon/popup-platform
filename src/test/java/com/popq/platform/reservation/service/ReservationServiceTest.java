@@ -9,6 +9,7 @@ import com.popq.platform.popup.entity.PopupStore;
 import com.popq.platform.reservation.dto.ReservationCreateRequest;
 import com.popq.platform.reservation.dto.ReservationDetailResponse;
 import com.popq.platform.reservation.dto.ReservationResponse;
+import com.popq.platform.reservation.dto.ReservationUpdateRequest;
 import com.popq.platform.reservation.entity.Reservation;
 import com.popq.platform.reservation.entity.ReservationStatus;
 import com.popq.platform.reservation.event.ReservationHoldCreatedEvent;
@@ -26,6 +27,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -1079,6 +1081,1139 @@ public class ReservationServiceTest {
         // 불필요한 후속 처리 미실행 확인
         verifyNoInteractions(
                 timeSlotRepository,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    // ==================== 예약 변경 ====================
+
+    @Test
+    @DisplayName("존재하지 않는 예약은 변경할 수 없다")
+    void updateReservation_reservationNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(1L, 2);
+
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.empty());
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                ReservationErrorCode.RESERVATION_NOT_FOUND,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+
+        verifyNoInteractions(
+                userRepository,
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원은 예약을 변경할 수 없다")
+    void updateReservation_userNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(1L, 2);
+
+        Reservation reservation = mock(Reservation.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+
+        AuthException exception = assertThrows(
+                AuthException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                AuthErrorCode.USER_NOT_FOUND,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        verify(reservation, never()).getUser();
+        verify(reservation, never()).getReservationStatus();
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("다른 회원의 예약은 변경할 수 없다")
+    void updateReservation_accessDenied() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long ownerId = 2L;
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(1L, 2);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        User owner = mock(User.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(owner);
+        when(owner.getId()).thenReturn(ownerId);
+
+        AuthException exception = assertThrows(
+                AuthException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                AuthErrorCode.ACCESS_DENIED,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        verify(reservation).getUser();
+        verify(user).getId();
+        verify(owner).getId();
+
+        verify(reservation, never()).getReservationStatus();
+        verify(reservation, never()).changeReservation(any(), anyInt());
+        verify(reservation, never()).renewQrToken(anyString());
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ReservationStatus.class,
+            names = {"CONFIRMED"},
+            mode = EnumSource.Mode.EXCLUDE
+    )
+    @DisplayName("CONFIRMED 상태가 아닌 예약은 변경할 수 없다")
+    void updateReservation_invalidStatus(ReservationStatus status) {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(1L, 2);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+
+        when(reservation.getReservationStatus()).thenReturn(status);
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                ReservationErrorCode.INVALID_RESERVATION_STATUS,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        verify(reservation).getUser();
+        verify(user, times(2)).getId();
+
+        verify(reservation).getReservationStatus();
+
+        verify(reservation, never()).changeReservation(any(), anyInt());
+        verify(reservation, never()).renewQrToken(anyString());
+
+        verifyNoInteractions(
+                timeSlotRepository,
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회차로 예약을 변경할 수 없다")
+    void updateReservation_timeSlotNotFound() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long oldTimeSlotId = 1L;
+        Long newTimeSlotId = 2L;
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(newTimeSlotId, 2);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot oldTimeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+        when(reservation.getTimeSlot()).thenReturn(oldTimeSlot);
+        when(oldTimeSlot.getTimeSlotId()).thenReturn(oldTimeSlotId);
+
+        // 기존 회차 조회 성공
+        when(timeSlotRepository.findByIdForUpdate(oldTimeSlotId)).thenReturn(Optional.of(oldTimeSlot));
+
+        // 변경할 회차 조회 실패
+        when(timeSlotRepository.findByIdForUpdate(newTimeSlotId)).thenReturn(Optional.empty());
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                ReservationErrorCode.TIMESLOT_NOT_FOUND,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        verify(timeSlotRepository).findByIdForUpdate(oldTimeSlotId);
+        verify(timeSlotRepository).findByIdForUpdate(newTimeSlotId);
+
+        verify(oldTimeSlot, never()).decreaseReservedCount(anyInt());
+        verify(reservation, never()).changeReservation(any(), anyInt());
+        verify(reservation, never()).renewQrToken(anyString());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("OPEN 상태가 아닌 회차로 예약을 변경할 수 없다")
+    void updateReservation_timeSlotNotOpen() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(timeSlotId, 2);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.of(timeSlot));
+
+        when(timeSlot.getSlotStatus()).thenReturn("CLOSED");
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                ReservationErrorCode.TIMESLOT_NOT_OPEN,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+        verify(timeSlotRepository).findByIdForUpdate(timeSlotId);
+
+        verify(timeSlot).getSlotStatus();
+
+        verify(timeSlot, never()).getSlotDate();
+        verify(timeSlot, never()).increaseReservedCount(anyInt());
+        verify(timeSlot, never()).decreaseReservedCount(anyInt());
+
+        verify(reservation, never()).changeReservation(any(), anyInt());
+        verify(reservation, never()).renewQrToken(anyString());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {-1, 0, 1})
+    @DisplayName("예약 가능 기간이 아니면 예약을 변경할 수 없다")
+    void updateReservation_invalidPeriod(int dayOffset) {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(timeSlotId, 2);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.of(timeSlot));
+
+        when(timeSlot.getSlotStatus()).thenReturn("OPEN");
+
+        LocalDate slotDate;
+
+        if (dayOffset == 1) {
+            slotDate = LocalDate.now().plusDays(TimeSlot.RESERV_OPEN_DAYS_BEFORE + 1L);
+        } else {
+            slotDate = LocalDate.now().plusDays(dayOffset);
+        }
+
+        when(timeSlot.getSlotDate()).thenReturn(slotDate);
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                ReservationErrorCode.RESERVATION_NOT_AVAILABLE,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+        verify(timeSlotRepository).findByIdForUpdate(timeSlotId);
+
+        verify(timeSlot).getSlotStatus();
+        verify(timeSlot, atLeastOnce()).getSlotDate();
+
+        verify(timeSlot, never()).increaseReservedCount(anyInt());
+        verify(timeSlot, never()).decreaseReservedCount(anyInt());
+
+        verify(reservation, never()).changeReservation(any(), anyInt());
+        verify(reservation, never()).renewQrToken(anyString());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {-1, 0, 4})
+    @DisplayName("유효하지 않은 인원으로 예약을 변경할 수 없다")
+    void updateReservation_invalidPeopleCount(int peopleCount) {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(timeSlotId, peopleCount);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.of(timeSlot));
+        when(timeSlot.getSlotStatus()).thenReturn("OPEN");
+
+        when(timeSlot.getSlotDate())
+                .thenReturn(LocalDate.now().plusDays(1));
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                ReservationErrorCode.INVALID_PEOPLE_COUNT,
+                exception.getErrorCode()
+        );
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+        verify(timeSlotRepository).findByIdForUpdate(timeSlotId);
+
+        verify(timeSlot).getSlotStatus();
+        verify(timeSlot, atLeastOnce()).getSlotDate();
+
+        verify(timeSlot, never()).getReservedCount();
+        verify(timeSlot, never()).getCapacity();
+
+        verify(timeSlot, never()).increaseReservedCount(anyInt());
+        verify(timeSlot, never()).decreaseReservedCount(anyInt());
+
+        verify(reservation, never()).changeReservation(any(), anyInt());
+        verify(reservation, never()).renewQrToken(anyString());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("동일 회차에서 잔여 정원을 초과하여 인원을 증가시킬 수 없다")
+    void updateReservation_sameSlot_capacityExceeded() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        // 동일 회차에서 기존 1명 -> 3명으로 변경 요청
+        ReservationUpdateRequest request = new ReservationUpdateRequest(timeSlotId, 3);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+
+        // 기존 회차와 변경 대상 회차를 동일하게 설정
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.of(timeSlot));
+
+        when(timeSlot.getSlotStatus()).thenReturn("OPEN");
+        when(timeSlot.getSlotDate()).thenReturn(LocalDate.now().plusDays(1));
+
+        // 기존 본인의 예약 인원: 1명
+        when(reservation.getPeopleCount()).thenReturn(1);
+
+        // 회차 전체 예약 인원: 9명
+        when(timeSlot.getReservedCount()).thenReturn(9);
+
+        // 회차 최대 정원: 10명
+        when(timeSlot.getCapacity()).thenReturn(10);
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                ReservationErrorCode.CAPACITY_EXCEEDED,
+                exception.getErrorCode()
+        );
+
+        // 예약, 회원, 회차 조회 확인
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+        verify(timeSlotRepository).findByIdForUpdate(timeSlotId);
+
+        verify(reservation).getPeopleCount();
+        verify(timeSlot).getReservedCount();
+        verify(timeSlot).getCapacity();
+
+        // 정원 초과 이후 예약 인원 변경이 발생하지 않아야 함
+        verify(timeSlot, never()).increaseReservedCount(anyInt());
+        verify(timeSlot, never()).decreaseReservedCount(anyInt());
+
+        // 예약 정보 변경 및 QR 토큰 재발급 미실행 확인
+        verify(reservation, never()).changeReservation(any(), anyInt());
+        verify(reservation, never()).renewQrToken(anyString());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("동일 회차에서 예약 인원을 정상적으로 증가시킨다")
+    void updateReservation_sameSlot_increasePeople() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        int oldPeopleCount = 1;
+        int newPeopleCount = 3;
+        int difference = newPeopleCount - oldPeopleCount;
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(5);
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(timeSlotId, newPeopleCount);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+
+        // 기존 회차와 변경 회차가 동일한 상황
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.of(timeSlot));
+
+        when(timeSlot.getSlotStatus()).thenReturn("OPEN");
+        when(timeSlot.getSlotDate()).thenReturn(LocalDate.now().plusDays(1));
+
+        // 기존 본인의 예약 인원: 1명
+        when(reservation.getPeopleCount()).thenReturn(oldPeopleCount);
+
+        // 기존 전체 예약 인원: 8명
+        // 변경 후 전체 예약 인원: 10명
+        when(timeSlot.getReservedCount()).thenReturn(8);
+        when(timeSlot.getCapacity()).thenReturn(10);
+
+        // 응답 DTO 변환에 필요한 데이터 설정
+        when(reservation.getReservationId()).thenReturn(reservationId);
+        when(reservation.getExpiresAt()).thenReturn(expiresAt);
+
+        // Mock 객체는 실제 메서드를 실행하지 않으므로
+        // changeReservation() 호출 시 예약 인원이 변경되도록 모의 처리
+        doAnswer(invocation -> {
+
+            int changedPeopleCount = invocation.getArgument(1);
+
+            when(reservation.getPeopleCount()).thenReturn(changedPeopleCount);
+
+            return null;
+
+        }).when(reservation).changeReservation(eq(timeSlot), eq(newPeopleCount));
+
+        // QR 토큰 재발급 시 전달받은 토큰이 저장되도록 모의 처리
+        doAnswer(invocation -> {
+
+            String token = invocation.getArgument(0);
+
+            when(reservation.getQrToken()).thenReturn(token);
+
+            return null;
+
+        }).when(reservation).renewQrToken(anyString());
+
+        ReservationResponse response =
+                reservationService.updateReservation(username, reservationId, request);
+
+        assertNotNull(response);
+
+        verify(timeSlotRepository, times(1)).findByIdForUpdate(timeSlotId);
+
+        // 전체 요청 인원 3명이 아니라 추가 인원 2명만 증가해야 함
+        verify(timeSlot).increaseReservedCount(difference);
+
+        // 인원 감소 처리는 발생하지 않아야 함
+        verify(timeSlot, never()).decreaseReservedCount(anyInt());
+
+        // 예약 정보 변경 확인
+        verify(reservation).changeReservation(timeSlot, newPeopleCount);
+
+        // 재발급된 QR 토큰 캡처
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+
+        verify(reservation).renewQrToken(tokenCaptor.capture());
+
+        String qrToken = tokenCaptor.getValue();
+
+        // UUID 형식의 QR 토큰인지 검증
+        assertNotNull(qrToken);
+        assertFalse(qrToken.isBlank());
+        assertDoesNotThrow(() -> UUID.fromString(qrToken));
+
+        // 변경된 응답 DTO 검증
+        assertEquals(reservationId, response.reservationId());
+        assertEquals(timeSlotId, response.timeSlotId());
+        assertEquals(newPeopleCount, response.peopleCount());
+
+        // 예약 변경 후에도 CONFIRMED 상태 유지
+        assertEquals(
+                ReservationStatus.CONFIRMED,
+                response.reservationStatus()
+        );
+
+        assertEquals(expiresAt, response.expiresAt());
+        assertEquals(qrToken, response.qrToken());
+
+        // 회차 정원이 변경되었으므로 변경 이벤트 1회 발행
+        verify(eventPublisher).publishEvent(any(TimeSlotChangedEvent.class));
+
+        // 별도의 예약 저장 호출 없이 엔티티 변경 처리
+        verify(reservationRepository, never()).save(any());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService
+        );
+    }
+
+    @Test
+    @DisplayName("동일 회차에서 예약 인원을 정상적으로 감소시킨다")
+    void updateReservation_sameSlot_decreasePeople() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        int oldPeopleCount = 3;
+        int newPeopleCount = 1;
+
+        // 감소한 인원은 양수로 계산
+        int difference = oldPeopleCount - newPeopleCount;
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(5);
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(timeSlotId, newPeopleCount);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+
+        // 동일 회차 변경 설정
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.of(timeSlot));
+
+        when(timeSlot.getSlotStatus()).thenReturn("OPEN");
+        when(timeSlot.getSlotDate()).thenReturn(LocalDate.now().plusDays(1));
+        when(reservation.getPeopleCount()).thenReturn(oldPeopleCount);
+
+        // 응답 DTO 데이터 설정
+        when(reservation.getReservationId()).thenReturn(reservationId);
+        when(reservation.getExpiresAt()).thenReturn(expiresAt);
+
+        // 예약 인원 변경 모의 처리
+        doAnswer(invocation -> {
+
+            int changedPeopleCount = invocation.getArgument(1);
+
+            when(reservation.getPeopleCount()).thenReturn(changedPeopleCount);
+
+            return null;
+
+        }).when(reservation).changeReservation(eq(timeSlot), eq(newPeopleCount));
+
+        // QR 토큰 재발급 모의 처리
+        doAnswer(invocation -> {
+
+            String token = invocation.getArgument(0);
+
+            when(reservation.getQrToken()).thenReturn(token);
+
+            return null;
+
+        }).when(reservation).renewQrToken(anyString());
+
+        ReservationResponse response = reservationService.updateReservation(username, reservationId, request);
+
+        assertNotNull(response);
+
+        // 동일 회차이므로 락 조회 1회 확인
+        verify(timeSlotRepository).findByIdForUpdate(timeSlotId);
+
+        verify(timeSlot, never()).getReservedCount();
+        verify(timeSlot, never()).getCapacity();
+
+        // 감소한 인원 2명만큼 정원 복구 확인
+        verify(timeSlot).decreaseReservedCount(difference);
+
+        // 인원 증가 처리는 발생하지 않아야 함
+        verify(timeSlot, never()).increaseReservedCount(anyInt());
+
+        // 예약 정보 변경 확인
+        verify(reservation).changeReservation(timeSlot, newPeopleCount);
+
+        // 재발급된 QR 토큰 캡처
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+
+        verify(reservation).renewQrToken(tokenCaptor.capture());
+
+        String qrToken = tokenCaptor.getValue();
+
+        assertNotNull(qrToken);
+        assertFalse(qrToken.isBlank());
+        assertDoesNotThrow(() -> UUID.fromString(qrToken));
+
+        // 응답 DTO 검증
+        assertEquals(reservationId, response.reservationId());
+        assertEquals(timeSlotId, response.timeSlotId());
+        assertEquals(newPeopleCount, response.peopleCount());
+
+        assertEquals(
+                ReservationStatus.CONFIRMED,
+                response.reservationStatus()
+        );
+
+        assertEquals(expiresAt, response.expiresAt());
+        assertEquals(qrToken, response.qrToken());
+
+        // 정원 복구 이후 회차 변경 이벤트 발행 확인
+        verify(eventPublisher).publishEvent(any(TimeSlotChangedEvent.class));
+
+        verify(reservationRepository, never()).save(any());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService
+        );
+    }
+
+    @Test
+    @DisplayName("동일 회차에서 예약 인원이 같으면 정원을 변경하지 않는다")
+    void updateReservation_sameSlot_samePeople() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long timeSlotId = 1L;
+
+        int peopleCount = 2;
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(5);
+
+        // 기존 예약과 동일한 회차 및 인원으로 변경 요청
+        ReservationUpdateRequest request = new ReservationUpdateRequest(timeSlotId, peopleCount);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot timeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+        when(reservation.getTimeSlot()).thenReturn(timeSlot);
+        when(timeSlot.getTimeSlotId()).thenReturn(timeSlotId);
+        when(timeSlotRepository.findByIdForUpdate(timeSlotId)).thenReturn(Optional.of(timeSlot));
+        when(timeSlot.getSlotStatus()).thenReturn("OPEN");
+        when(timeSlot.getSlotDate()).thenReturn(LocalDate.now().plusDays(1));
+
+        // 기존 예약 인원과 변경 요청 인원이 동일
+        when(reservation.getPeopleCount()).thenReturn(peopleCount);
+
+        // 응답 DTO 변환 데이터 설정
+        when(reservation.getReservationId()).thenReturn(reservationId);
+        when(reservation.getExpiresAt()).thenReturn(expiresAt);
+
+        // 현재 서비스는 인원이 동일하더라도 QR 토큰을 재발급함
+        doAnswer(invocation -> {
+
+            String token = invocation.getArgument(0);
+
+            when(reservation.getQrToken()).thenReturn(token);
+
+            return null;
+
+        }).when(reservation).renewQrToken(anyString());
+
+        ReservationResponse response = reservationService.updateReservation(username, reservationId, request);
+
+        assertNotNull(response);
+
+        // 동일 회차이므로 락 조회 1회 확인
+        verify(timeSlotRepository).findByIdForUpdate(timeSlotId);
+
+        verify(timeSlot, never()).getReservedCount();
+        verify(timeSlot, never()).getCapacity();
+        verify(timeSlot, never()).increaseReservedCount(anyInt());
+        verify(timeSlot, never()).decreaseReservedCount(anyInt());
+        verify(reservation).changeReservation(timeSlot, peopleCount);
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+
+        verify(reservation).renewQrToken(tokenCaptor.capture());
+
+        String qrToken = tokenCaptor.getValue();
+
+        assertNotNull(qrToken);
+        assertFalse(qrToken.isBlank());
+        assertDoesNotThrow(() -> UUID.fromString(qrToken));
+
+        // 기존 예약 정보가 유지되는지 확인
+        assertEquals(reservationId, response.reservationId());
+        assertEquals(timeSlotId, response.timeSlotId());
+        assertEquals(peopleCount, response.peopleCount());
+
+        assertEquals(
+                ReservationStatus.CONFIRMED,
+                response.reservationStatus()
+        );
+
+        assertEquals(expiresAt, response.expiresAt());
+        assertEquals(qrToken, response.qrToken());
+
+        // 별도의 저장 호출 미실행
+        verify(reservationRepository, never()).save(any());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("잔여 정원이 부족한 다른 회차로 변경할 수 없다")
+    void updateReservation_differentSlot_capacityExceeded() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+        Long oldTimeSlotId = 1L;
+        Long newTimeSlotId = 2L;
+
+        int newPeopleCount = 2;
+
+        // 기존 회차 1번에서 새 회차 2번으로 변경 요청
+        ReservationUpdateRequest request = new ReservationUpdateRequest(newTimeSlotId, newPeopleCount);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot oldTimeSlot = mock(TimeSlot.class);
+        TimeSlot newTimeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+
+        // 기존 예약과 연결된 회차 설정
+        when(reservation.getTimeSlot()).thenReturn(oldTimeSlot);
+
+        when(oldTimeSlot.getTimeSlotId()).thenReturn(oldTimeSlotId);
+        when(newTimeSlot.getTimeSlotId()).thenReturn(newTimeSlotId);
+
+        // 기존 회차와 변경 대상 회차 모두 락 조회 성공
+        when(timeSlotRepository.findByIdForUpdate(oldTimeSlotId)).thenReturn(Optional.of(oldTimeSlot));
+        when(timeSlotRepository.findByIdForUpdate(newTimeSlotId)).thenReturn(Optional.of(newTimeSlot));
+
+        when(newTimeSlot.getSlotStatus()).thenReturn("OPEN");
+        when(newTimeSlot.getSlotDate()).thenReturn(LocalDate.now().plusDays(1));
+
+        // 새 회차의 현재 예약 인원: 9명
+        // 최대 정원: 10명
+        when(newTimeSlot.getReservedCount()).thenReturn(9);
+        when(newTimeSlot.getCapacity()).thenReturn(10);
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                ReservationErrorCode.CAPACITY_EXCEEDED,
+                exception.getErrorCode()
+        );
+
+        // 예약 및 회원 조회 확인
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+
+        // 두 회차의 락 조회 확인
+        verify(timeSlotRepository).findByIdForUpdate(oldTimeSlotId);
+        verify(timeSlotRepository).findByIdForUpdate(newTimeSlotId);
+
+        // 새 회차에 대해서만 정원 검증 수행
+        verify(newTimeSlot).getReservedCount();
+        verify(newTimeSlot).getCapacity();
+
+        verify(oldTimeSlot, never()).getReservedCount();
+        verify(oldTimeSlot, never()).getCapacity();
+
+        // 변경 실패 시 기존 회차의 예약 인원이 감소하면 안 됨
+        verify(oldTimeSlot, never()).decreaseReservedCount(anyInt());
+
+        // 새 회차의 예약 인원도 증가하면 안 됨
+        verify(newTimeSlot, never()).increaseReservedCount(anyInt());
+
+        // 기존 예약 인원을 복구하는 단계까지 진행하지 않음
+        verify(reservation, never()).getPeopleCount();
+
+        // 예약 정보 변경 및 QR 토큰 재발급 미실행
+        verify(reservation, never()).changeReservation(any(), anyInt());
+        verify(reservation, never()).renewQrToken(anyString());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService,
+                eventPublisher
+        );
+    }
+
+    @Test
+    @DisplayName("다른 회차로 정상 변경하고 기존 회차 정원을 복구한다")
+    void updateReservation_differentSlot_success() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+
+        Long oldTimeSlotId = 1L;
+        Long newTimeSlotId = 2L;
+
+        int oldPeopleCount = 2;
+        int newPeopleCount = 3;
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(5);
+
+        // 기존 회차 1번 → 새 회차 2번
+        // 기존 예약 인원 2명 → 변경 예약 인원 3명
+        ReservationUpdateRequest request = new ReservationUpdateRequest(newTimeSlotId, newPeopleCount);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot oldTimeSlot = mock(TimeSlot.class);
+        TimeSlot newTimeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+
+        // 기존 예약에 연결된 회차 및 인원 설정
+        when(reservation.getTimeSlot()).thenReturn(oldTimeSlot);
+        when(reservation.getPeopleCount()).thenReturn(oldPeopleCount);
+
+        when(oldTimeSlot.getTimeSlotId()).thenReturn(oldTimeSlotId);
+        when(newTimeSlot.getTimeSlotId()).thenReturn(newTimeSlotId);
+
+        // 기존 회차와 새 회차 모두 락 조회 성공
+        when(timeSlotRepository.findByIdForUpdate(oldTimeSlotId)).thenReturn(Optional.of(oldTimeSlot));
+        when(timeSlotRepository.findByIdForUpdate(newTimeSlotId)).thenReturn(Optional.of(newTimeSlot));
+
+        when(newTimeSlot.getSlotStatus()).thenReturn("OPEN");
+        when(newTimeSlot.getSlotDate()).thenReturn(LocalDate.now().plusDays(1));
+
+        // 새 회차 전체 예약 인원 7명 + 요청 인원 3명 = 10명
+        when(newTimeSlot.getReservedCount()).thenReturn(7);
+        when(newTimeSlot.getCapacity()).thenReturn(10);
+
+        // 응답 DTO 변환 데이터 설정
+        when(reservation.getReservationId()).thenReturn(reservationId);
+        when(reservation.getExpiresAt()).thenReturn(expiresAt);
+
+        // 예약 변경 메서드 호출 시 회차와 인원이 함께 변경되도록 모의 처리
+        doAnswer(invocation -> {
+
+            // changeReservation()의 첫 번째 인자는 변경할 회차
+            TimeSlot changedTimeSlot = invocation.getArgument(0);
+
+            // 두 번째 인자는 변경할 예약 인원
+            int changedPeopleCount = invocation.getArgument(1);
+
+            when(reservation.getTimeSlot()).thenReturn(changedTimeSlot);
+            when(reservation.getPeopleCount()).thenReturn(changedPeopleCount);
+
+            return null;
+
+        }).when(reservation).changeReservation(eq(newTimeSlot), eq(newPeopleCount));
+
+        // QR 토큰 재발급 모의 처리
+        doAnswer(invocation -> {
+
+            String token = invocation.getArgument(0);
+
+            when(reservation.getQrToken()).thenReturn(token);
+
+            return null;
+
+        }).when(reservation).renewQrToken(anyString());
+
+        ReservationResponse response =
+                reservationService.updateReservation(username, reservationId, request);
+
+        assertNotNull(response);
+
+        verify(reservationRepository).findById(reservationId);
+        verify(userRepository).findByUsername(username);
+        verify(timeSlotRepository).findByIdForUpdate(oldTimeSlotId);
+        verify(timeSlotRepository).findByIdForUpdate(newTimeSlotId);
+
+        verify(newTimeSlot).getReservedCount();
+        verify(newTimeSlot).getCapacity();
+
+        // 기존 회차에서 기존 예약 인원 2명만큼 복구
+        verify(oldTimeSlot).decreaseReservedCount(oldPeopleCount);
+
+        // 새 회차에 변경 요청 인원 전체인 3명만큼 증가
+        verify(newTimeSlot).increaseReservedCount(newPeopleCount);
+
+        // 반대 방향의 정원 변경은 발생하지 않아야 함
+        verify(oldTimeSlot, never()).increaseReservedCount(anyInt());
+        verify(newTimeSlot, never()).decreaseReservedCount(anyInt());
+
+        // 예약 정보가 새 회차 및 새 인원으로 변경되는지 확인
+        verify(reservation).changeReservation(newTimeSlot, newPeopleCount);
+
+        // 재발급된 QR 토큰 캡처 및 검증
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+
+        verify(reservation).renewQrToken(tokenCaptor.capture());
+
+        String qrToken = tokenCaptor.getValue();
+
+        assertNotNull(qrToken);
+        assertFalse(qrToken.isBlank());
+        assertDoesNotThrow(() -> UUID.fromString(qrToken));
+
+        // 응답 DTO 검증
+        assertEquals(reservationId, response.reservationId());
+
+        // 응답에는 기존 회차가 아닌 새 회차 ID가 반환되어야 함
+        assertEquals(newTimeSlotId, response.timeSlotId());
+
+        // 변경된 예약 인원 확인
+        assertEquals(newPeopleCount, response.peopleCount());
+
+        // 예약 변경 후에도 CONFIRMED 상태 유지
+        assertEquals(
+                ReservationStatus.CONFIRMED,
+                response.reservationStatus()
+        );
+
+        assertEquals(expiresAt, response.expiresAt());
+        assertEquals(qrToken, response.qrToken());
+
+        // 기존 회차와 새 회차의 정원이 모두 변경되므로 회차 변경 이벤트가 총 2회 발행되어야 함
+        verify(eventPublisher, times(2)).publishEvent(any(TimeSlotChangedEvent.class));
+
+        // 별도의 예약 저장 호출 미실행 확인
+        verify(reservationRepository, never()).save(any());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
+                reservationExpirationService
+        );
+    }
+
+    @Test
+    @DisplayName("다른 회차로 변경할 때 작은 회차 ID부터 락을 획득한다")
+    void updateReservation_lockOrder() {
+
+        String username = "testUser";
+        Long reservationId = 1L;
+        Long userId = 1L;
+
+        // 의도적으로 기존 회차 ID를 더 크게 설정
+        Long oldTimeSlotId = 2L;
+        Long newTimeSlotId = 1L;
+
+        ReservationUpdateRequest request = new ReservationUpdateRequest(newTimeSlotId, 2);
+
+        Reservation reservation = mock(Reservation.class);
+        User user = mock(User.class);
+        TimeSlot oldTimeSlot = mock(TimeSlot.class);
+        TimeSlot newTimeSlot = mock(TimeSlot.class);
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+
+        when(user.getId()).thenReturn(userId);
+        when(reservation.getUser()).thenReturn(user);
+        when(reservation.getReservationStatus()).thenReturn(ReservationStatus.CONFIRMED);
+
+        // 기존 예약은 ID가 더 큰 2번 회차에 연결
+        when(reservation.getTimeSlot()).thenReturn(oldTimeSlot);
+        when(oldTimeSlot.getTimeSlotId()).thenReturn(oldTimeSlotId);
+
+        when(timeSlotRepository.findByIdForUpdate(newTimeSlotId)).thenReturn(Optional.of(newTimeSlot));
+        when(timeSlotRepository.findByIdForUpdate(oldTimeSlotId)).thenReturn(Optional.of(oldTimeSlot));
+
+        // 이번 테스트의 목적은 락 조회 순서 검증이므로 두 회차의 락 조회 이후 회차 운영 상태 검증에서 종료시킴
+        when(newTimeSlot.getSlotStatus()).thenReturn("CLOSED");
+
+        ReservationException exception = assertThrows(
+                ReservationException.class,
+                () -> reservationService.updateReservation(username, reservationId, request)
+        );
+
+        assertEquals(
+                ReservationErrorCode.TIMESLOT_NOT_OPEN,
+                exception.getErrorCode()
+        );
+
+        // InOrder: Mock 객체의 메서드 호출 순서를 검증하는 기능
+        InOrder inOrder = inOrder(timeSlotRepository);
+
+        // ID가 작은 1번 회차를 먼저 조회해야 함
+        inOrder.verify(timeSlotRepository).findByIdForUpdate(newTimeSlotId);
+
+        // 그 다음 ID가 큰 2번 회차를 조회해야 함
+        inOrder.verify(timeSlotRepository).findByIdForUpdate(oldTimeSlotId);
+
+        // 불필요한 추가 회차 조회가 없는지 확인
+        verifyNoMoreInteractions(timeSlotRepository);
+
+        // 회차 운영 상태 검증 실패 이후 정원 변경 미실행
+        verify(oldTimeSlot, never()).decreaseReservedCount(anyInt());
+        verify(newTimeSlot, never()).increaseReservedCount(anyInt());
+
+        // 예약 정보 변경 및 QR 토큰 재발급 미실행 확인
+        verify(reservation, never()).changeReservation(any(), anyInt());
+        verify(reservation, never()).renewQrToken(anyString());
+
+        verifyNoInteractions(
+                redisExpirationKeyService,
                 reservationExpirationService,
                 eventPublisher
         );
