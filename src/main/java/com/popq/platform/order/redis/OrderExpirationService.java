@@ -3,6 +3,8 @@ package com.popq.platform.order.redis;
 import com.popq.platform.order.entity.Order;
 import com.popq.platform.order.entity.OrderItem;
 import com.popq.platform.order.entity.OrderStatus;
+import com.popq.platform.order.exception.OrderErrorCode;
+import com.popq.platform.order.exception.OrderException;
 import com.popq.platform.order.repository.OrderRepository;
 import com.popq.platform.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +24,7 @@ public class OrderExpirationService {
     public void expireOrder(Long orderId) {
 
         Order order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("주문이 없습니다."));
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
         if(order.getOrderStatus() != OrderStatus.PENDING){
             return;
@@ -40,7 +42,7 @@ public class OrderExpirationService {
             );
 
             if(updatedRows == 0){
-                throw new IllegalArgumentException("주문 만료 중 재고 복구에 실패했습니다.");
+                throw new OrderException(OrderErrorCode.STOCK_RESTORE_FAILED);
             }
         }
 
