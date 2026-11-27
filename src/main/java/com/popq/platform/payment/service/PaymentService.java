@@ -52,6 +52,9 @@ public class PaymentService {
     @Value("${toss.secret-key}")
     private String tossSecretKey;
 
+    @Value("${toss.api-base-url:https://api.tosspayments.com}")
+    private String tossApiBaseUrl;
+
     // 결제 승인
     @Transactional
     public PaymentResponse confirmPayment(String username, PaymentRequest request) {
@@ -133,7 +136,7 @@ public class PaymentService {
 
         try {
             restClient.post()
-                    .uri("https://api.tosspayments.com/v1/payments/confirm")
+                    .uri(tossApiBaseUrl + "/v1/payments/confirm")
                     .headers(headers -> {
                         headers.setBasicAuth(tossSecretKey, "");
                         headers.set("Idempotency-Key", "confirm-" + request.getOrderId());
@@ -164,7 +167,7 @@ public class PaymentService {
         try {
             restClient.post()
                     .uri(
-                            "https://api.tosspayments.com/v1/payments/{paymentKey}/cancel",
+                            tossApiBaseUrl + "/v1/payments/{paymentKey}/cancel",
                             paymentKey
                     )
                     .headers(headers -> {
@@ -193,7 +196,7 @@ public class PaymentService {
         try {
             TossPaymentResponse response = restClient.get()
                     .uri(
-                            "https://api.tosspayments.com/v1/payments/{paymentKey}",
+                            tossApiBaseUrl + "/v1/payments/{paymentKey}",
                             paymentKey
                     )
                     .headers(headers -> headers.setBasicAuth(tossSecretKey, ""))

@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/v1/payments/mock-payment-001"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "paymentKey": "mock-payment-001",
+      "orderId": "5c1f455b05424bb58bd263097967427f",
+      "status": "ABORTED",
+      "totalAmount": 59000,
+      "balanceAmount": 0
+    }
+  }
+}
