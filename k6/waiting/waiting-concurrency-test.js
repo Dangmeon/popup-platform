@@ -11,14 +11,14 @@ import {
 import { loginUsers } from '../common/auth.js';
 import { concurrencyOptions } from '../common/options.js';
 
-// 동시성 테스트 설정 (가이드 8·9절 규격)
+// 동시성 테스트 설정
 const VUS = Number(__ENV.VUS || 10);
 // 웨이팅은 정원 제한 없이 전원 대기번호를 정상 발급받으므로 EXPECTED_SUCCESS = VUS
 const EXPECTED_SUCCESS = Number(__ENV.EXPECTED_SUCCESS || VUS);
 
 export const options = concurrencyOptions(VUS, EXPECTED_SUCCESS);
 
-// 가이드 9절 필수 집계 Counter
+// 집계 Counter
 const successCount = new Counter('success_count');
 const rejectedCount = new Counter('rejected_count');
 const unexpectedError = new Counter('unexpected_error');
