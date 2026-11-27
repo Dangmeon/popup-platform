@@ -7,13 +7,8 @@ import {
     getBody,
 } from '../common/config.js';
 
-import {
-    getAccount,
-} from '../common/accounts.js';
-
-import {
-    login,
-} from '../common/auth.js';
+import { getAccount } from '../common/accounts.js';
+import { login } from '../common/auth.js';
 
 // 생성할 테스트 회원 수
 // 환경변수가 없으면 기본 100명 생성
@@ -66,24 +61,26 @@ export default function () {
 
         let ready = false;
 
-        // 신규 가입 성공 또는 기존 회원 충돌
+        // 신규 가입 성공 또는 기존 계정 존재 가능성
+        // 기존 회원 가입 요청 시 서버에서 400을 반환하는 경우 고려
         if (
             response.status === 200 ||
+            response.status === 400 ||
             response.status === 409
         ) {
             try {
-                // 실제 로그인까지 성공하는지 확인
-                // 기존 계정인 경우에도 동일하게 검증
+
+                // 실제 로그인까지 성공해야 준비 완료 처리
                 login(i);
                 ready = true;
 
             } catch (error) {
+
                 ready = false;
 
-                // 회원가입은 성공했지만 로그인에 실패한 경우
-                // 기존 계정의 비밀번호 불일치 및 인증 오류 확인
+                // 로그인 실패 원인 출력
                 console.error(
-                    `회원 ${i} 로그인 실패: ${error.message}`
+                    `회원 ${i} 로그인 검증 실패: ${error.message}`
                 );
             }
         }
@@ -97,16 +94,22 @@ export default function () {
 
             successCount++;
 
-            console.log(`회원 준비 완료: ${i}`);
+            console.log(
+                `회원 준비 완료: ${i} (signup status=${response.status})`
+            );
 
         } else {
 
             failedCount++;
 
+            // 회원가입 실패 응답 확인
+            const errorBody = getBody(response);
+
             console.error(
                 `회원 준비 실패: ${i}, ` +
                 `status=${response.status}, ` +
-                `code=${getBody(response)?.code}`
+                `code=${errorBody?.code || '없음'}, ` +
+                `message=${errorBody?.message || '없음'}`
             );
         }
     }
