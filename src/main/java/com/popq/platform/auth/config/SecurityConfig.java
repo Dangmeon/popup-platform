@@ -41,12 +41,16 @@ public class SecurityConfig {
                         // 회원가입 및 로그인 등 인증 없이 접근해야 하는 경로 허용
                         .requestMatchers("/api/auth/**").permitAll()
 
+                        // WebSocket 최초 연결(handshake) 경로 허용
+                        .requestMatchers("/ws/**").permitAll()
+
                         .requestMatchers(HttpMethod.GET,
                                 "/api/popups/**", "/api/products/**").permitAll()
 
                         // 순수 ADMIN만 접근 가능한 경로
                         .requestMatchers("/api/admin/members/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/orders/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/coupons/**").hasRole("ADMIN")
 
                         // ADMIN과 MANAGER 모두 접근 가능한 관리자 API 경로
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
