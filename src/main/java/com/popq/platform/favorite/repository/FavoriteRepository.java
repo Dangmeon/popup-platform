@@ -36,4 +36,11 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
     //    - 찜이 0개인 팝업은 GROUP BY 결과에 포함되지 않으므로 서비스에서 getOrDefault(popId, 0L)로 0 처리
     @Query("SELECT f.popupStore.popId, COUNT(f) FROM Favorite f WHERE f.targetType = 'POPUP' AND f.popupStore.popId IN :popIds GROUP BY f.popupStore.popId")
     List<Object[]> countFavoritesByPopIds(@Param("popIds") List<Long> popIds);
+
+    @Query("SELECT f FROM Favorite f " +
+            "JOIN FETCH f.popupStore p " +
+            "WHERE f.member.username = :email " +
+            "AND f.targetType = 'POPUP' " +
+            "ORDER BY f.createdAt DESC")
+    List<Favorite> findAllByEmailWithPopup(@Param("email") String email);
 }

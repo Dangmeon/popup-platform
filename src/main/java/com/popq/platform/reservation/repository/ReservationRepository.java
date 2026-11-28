@@ -85,6 +85,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("status") ReservationStatus status
     );
 
+    @Query("SELECT r FROM Reservation r " +
+            "JOIN FETCH r.timeSlot ts " +
+            "JOIN FETCH ts.popupStore p " +
+            "WHERE r.user.username = :email " +
+            "ORDER BY r.reservedAt DESC")
+    List<Reservation> findAllByEmailWithDetails(@Param("email") String email);
+
     // 해당 회차에 예약 이력이 하나라도 존재하는지 확인
     boolean existsByTimeSlot_TimeSlotId(Long timeSlotId);
 }
