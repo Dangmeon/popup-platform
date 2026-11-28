@@ -42,7 +42,8 @@ public class CouponService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
 
-        Coupon coupon = couponRepository.findById(couponId)
+        // 재고 차감과 중복 확인이 동시에 일어나지 않도록 쿠폰 행을 잠그고 조회
+        Coupon coupon = couponRepository.findByIdForUpdate(couponId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
 
         // 중복 발급 방어

@@ -92,7 +92,7 @@ class CouponServiceTest {
         Coupon coupon = createCoupon(10L, "웰컴 쿠폰", 5000, 10, LocalDateTime.now().plusDays(5));
 
         given(userRepository.findByUsername("tester01@gmail.com")).willReturn(Optional.of(user));
-        given(couponRepository.findById(10L)).willReturn(Optional.of(coupon));
+        given(couponRepository.findByIdForUpdate(10L)).willReturn(Optional.of(coupon));
         given(userCouponRepository.existsByUserAndCoupon(user, coupon)).willReturn(false);
         given(userCouponRepository.save(any(UserCoupon.class))).willAnswer(invocation -> invocation.getArgument(0));
 
@@ -109,7 +109,7 @@ class CouponServiceTest {
         Coupon coupon = createCoupon(10L, "웰컴 쿠폰", 5000, 10, LocalDateTime.now().plusDays(5));
 
         given(userRepository.findByUsername("tester01@gmail.com")).willReturn(Optional.of(user));
-        given(couponRepository.findById(10L)).willReturn(Optional.of(coupon));
+        given(couponRepository.findByIdForUpdate(10L)).willReturn(Optional.of(coupon));
         given(userCouponRepository.existsByUserAndCoupon(user, coupon)).willReturn(true);
 
         assertThatThrownBy(() -> couponService.issueCoupon("tester01@gmail.com", 10L))
@@ -127,7 +127,7 @@ class CouponServiceTest {
         Coupon coupon = createCoupon(10L, "선착순 쿠폰", 5000, 0, LocalDateTime.now().plusDays(5));
 
         given(userRepository.findByUsername("tester01@gmail.com")).willReturn(Optional.of(user));
-        given(couponRepository.findById(10L)).willReturn(Optional.of(coupon));
+        given(couponRepository.findByIdForUpdate(10L)).willReturn(Optional.of(coupon));
         given(userCouponRepository.existsByUserAndCoupon(user, coupon)).willReturn(false);
 
         assertThatThrownBy(() -> couponService.issueCoupon("tester01@gmail.com", 10L))
