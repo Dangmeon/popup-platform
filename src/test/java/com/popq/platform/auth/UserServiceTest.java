@@ -53,7 +53,6 @@ class UserServiceTest {
         ReflectionTestUtils.setField(request, "password", password);
         ReflectionTestUtils.setField(request, "name", "테스터");
         ReflectionTestUtils.setField(request, "phone", "010-1234-5678");
-        ReflectionTestUtils.setField(request, "role", "USER");
         return request;
     }
 

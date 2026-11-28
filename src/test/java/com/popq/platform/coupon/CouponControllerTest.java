@@ -2,6 +2,7 @@ package com.popq.platform.coupon;
 
 import com.popq.platform.auth.config.JwtTokenProvider;
 import com.popq.platform.auth.config.SecurityConfig;
+import com.popq.platform.coupon.controller.AdminCouponController;
 import com.popq.platform.coupon.controller.CouponController;
 import com.popq.platform.coupon.dto.UserCouponResponse;
 import com.popq.platform.coupon.service.CouponService;
@@ -19,14 +20,13 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = CouponController.class)
+@WebMvcTest(controllers = {CouponController.class, AdminCouponController.class})
 @Import(SecurityConfig.class)
 class CouponControllerTest {
 
@@ -60,7 +60,7 @@ class CouponControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/coupons/admin")
+        mockMvc.perform(post("/api/admin/coupons")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -68,6 +68,30 @@ class CouponControllerTest {
                 .andExpect(content().string("쿠폰이 성공적으로 생성되었습니다."));
 
         then(couponService).should().createCoupon(any());
+    }
+
+    @Test
+    @DisplayName("MANAGER가 쿠폰 생성을 요청하면 403을 반환한다")
+    void createCoupon_fail_manager() throws Exception {
+        String token = "manager.jwt.token";
+        mockValidToken(token, "manager@gmail.com", "MANAGER");
+
+        String body = """
+                {
+                  "name": "신규 회원 쿠폰",
+                  "discountAmount": 3000,
+                  "stock": 50,
+                  "expiredAt": "2026-12-31T23:59:00"
+                }
+                """;
+
+        mockMvc.perform(post("/api/admin/coupons")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        then(couponService).should(never()).createCoupon(any());
     }
 
     @Test

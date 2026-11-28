@@ -31,6 +31,4 @@ public class SignupRequest {
     @NotBlank(message = "전화번호는 필수 입력 값입니다.")
     private String phone;
 
-    private String role;
-
 }

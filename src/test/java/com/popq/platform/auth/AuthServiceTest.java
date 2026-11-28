@@ -49,13 +49,12 @@ class AuthServiceTest {
     @InjectMocks
     private AuthService authService;
 
-    private SignupRequest createSignupRequest(String username, String password, String role) {
+    private SignupRequest createSignupRequest(String username, String password) {
         SignupRequest request = new SignupRequest();
         ReflectionTestUtils.setField(request, "username", username);
         ReflectionTestUtils.setField(request, "password", password);
         ReflectionTestUtils.setField(request, "name", "테스터");
         ReflectionTestUtils.setField(request, "phone", "010-1234-5678");
-        ReflectionTestUtils.setField(request, "role", role);
         return request;
     }
 
@@ -91,9 +90,9 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("회원가입 성공 시 비밀번호 암호화 및 역할 지정 후 저장한다")
-    void signup_success_managerRole() {
-        SignupRequest request = createSignupRequest("manager01@gmail.com", "Test1234!", "MANAGER");
+    @DisplayName("회원가입 성공 시 비밀번호를 암호화하고 권한은 USER로 저장한다")
+    void signup_success_alwaysUserRole() {
+        SignupRequest request = createSignupRequest("manager01@gmail.com", "Test1234!");
         given(userRepository.existsByUsername("manager01@gmail.com")).willReturn(false);
         given(passwordEncoder.encode("Test1234!")).willReturn("ENCODED_PW");
 
@@ -103,13 +102,13 @@ class AuthServiceTest {
         then(userRepository).should().save(userCaptor.capture());
         assertThat(userCaptor.getValue().getUsername()).isEqualTo("manager01@gmail.com");
         assertThat(userCaptor.getValue().getPassword()).isEqualTo("ENCODED_PW");
-        assertThat(userCaptor.getValue().getRole()).isEqualTo(Role.MANAGER);
+        assertThat(userCaptor.getValue().getRole()).isEqualTo(Role.USER);
     }
 
     @Test
     @DisplayName("이미 사용 중인 이메일로 회원가입 시 예외가 발생한다")
     void signup_fail_duplicateEmail() {
-        SignupRequest request = createSignupRequest("tester01@gmail.com", "Test1234!", "USER");
+        SignupRequest request = createSignupRequest("tester01@gmail.com", "Test1234!");
         given(userRepository.existsByUsername("tester01@gmail.com")).willReturn(true);
 
         assertThatThrownBy(() -> authService.signup(request))

@@ -43,17 +43,12 @@ public class AuthService {
 
         String encodedPassword = passwordEncoder.encode(requestDto.getPassword());
 
-        Role userRole = Role.USER;
-        if (requestDto.getRole() != null && "MANAGER".equalsIgnoreCase(requestDto.getRole().trim())) {
-            userRole = Role.MANAGER;
-        }
-
         User user = User.builder()
                 .username(requestDto.getUsername())
                 .password(encodedPassword)
                 .name(requestDto.getName())
                 .phone(requestDto.getPhone())
-                .role(userRole)
+                .role(Role.USER)
                 .build();
 
         userRepository.save(user);
